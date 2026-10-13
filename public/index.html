@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#205d42">
+  <meta name="description" content="Aprovecha primero los alimentos que se acercan a su fecha y cocina con lo que ya tienes.">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css">
+  <title>Primero esto · Tu despensa a tiempo</title>
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Primero esto, inicio"><span class="brand-icon">✳</span><span>primero esto</span></a>
+      <div class="top-actions">
+        <button type="button" class="ghost-button" id="shareBtn" title="Copiar un enlace para abrir esta despensa en otro dispositivo">Compartir despensa</button>
+        <button type="button" class="primary-button small" id="addTopBtn">+ Añadir alimento</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">TU COCINA, CON MENOS DESPERDICIO</p>
+          <h1>Come lo que tienes.<br><em>Antes de que sea tarde.</em></h1>
+          <p class="lead">Fotografía tus alimentos, recibe avisos a tiempo y descubre qué cocinar con lo que sigue en tu frigo.</p>
+          <div class="hero-actions">
+            <button type="button" class="primary-button" id="addHeroBtn">Añadir a mi despensa <span aria-hidden="true">↗</span></button>
+            <a class="text-link" href="#recipes">Ver recetas <span aria-hidden="true">→</span></a>
+          </div>
+        </div>
+        <div class="hero-visual" aria-hidden="true">
+          <div class="visual-orbit orbit-one"></div><div class="visual-orbit orbit-two"></div>
+          <div class="food-badge badge-tomato">🍅</div><div class="food-badge badge-leaf">🥬</div><div class="food-badge badge-egg">🥚</div>
+          <div class="visual-note"><span class="pulse-dot"></span><span>Lo próximo a caducar<br><strong>siempre a la vista</strong></span></div>
+        </div>
+      </section>
+
+      <section class="dashboard" aria-label="Resumen de tu despensa">
+        <div class="section-heading"><div><p class="eyebrow">UN VISTAZO RÁPIDO</p><h2>Tu despensa hoy</h2></div><span id="todayLabel" class="today-label"></span></div>
+        <div class="stat-grid">
+          <div class="stat-card"><span class="stat-icon green">✦</span><strong id="countAvailable">0</strong><span>disponibles</span></div>
+          <div class="stat-card"><span class="stat-icon orange">◷</span><strong id="countSoon">0</strong><span>próximos a su fecha</span></div>
+          <div class="stat-card"><span class="stat-icon cream">✓</span><strong id="countUsed">0</strong><span>aprovechados</span></div>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <div class="pantry-panel">
+          <div class="section-heading compact"><div><p class="eyebrow">LO QUE TIENES</p><h2>En tu frigo</h2></div><button type="button" class="outline-button" id="addListBtn">+ Añadir</button></div>
+          <div class="filters" role="group" aria-label="Filtrar alimentos">
+            <button class="filter active" data-filter="available">Disponibles</button>
+            <button class="filter" data-filter="all">Todos</button>
+            <button class="filter" data-filter="consumed">Aprovechados</button>
+          </div>
+          <div id="itemList" class="item-list"><p class="loading">Cargando despensa…</p></div>
+        </div>
+        <aside class="side-column">
+          <div class="notice-card" id="noticeCard">
+            <span class="notice-icon">🔔</span>
+            <p class="eyebrow">QUE NO SE TE PASE</p>
+            <h3>Avisos en el momento justo</h3>
+            <p>Te avisaremos 3 días antes, 1 día antes y el mismo día de la fecha indicada.</p>
+            <button type="button" class="dark-button" id="notifyBtn">Activar notificaciones</button>
+            <button type="button" class="test-button" id="testNotifyBtn">Enviar aviso de prueba</button>
+            <small id="notifyStatus">Tu navegador te pedirá permiso.</small>
+          </div>
+          <div class="tip-card"><span class="tip-icon">✳</span><h3>Un pequeño gesto, una gran diferencia</h3><p>Marca lo que ya has consumido para que las recetas usen solo los alimentos disponibles.</p></div>
+        </aside>
+      </section>
+
+      <section class="recipe-section" id="recipes">
+        <div class="section-heading"><div><p class="eyebrow">IDEAS PARA HOY</p><h2>Recetas con lo que tienes</h2><p class="section-subtitle">Priorizamos los ingredientes más cercanos a su fecha.</p></div></div>
+        <div id="recipeList" class="recipe-grid"></div>
+      </section>
+    </main>
+
+    <footer><span class="brand footer-brand"><span class="brand-icon">✳</span><span>primero esto</span></span><span>Más ideas para cocinar. Menos comida olvidada.</span></footer>
+  </div>
+
+  <dialog id="addDialog" class="add-dialog">
+    <form id="addForm" method="dialog">
+      <div class="dialog-heading"><div><p class="eyebrow">NUEVO ALIMENTO</p><h2>Añadir a la despensa</h2></div><button type="button" class="close-button" id="closeDialog" aria-label="Cerrar">×</button></div>
+      <div class="photo-box">
+        <span class="photo-icon">📷</span><strong>¿Tienes el producto a mano?</strong><span>Fotografía el producto y su etiqueta. Revisarás los datos antes de guardar.</span>
+        <div class="photo-inputs"><label class="photo-label">Foto del producto<input type="file" id="productPhoto" accept="image/jpeg,image/png,image/webp" capture="environment"></label><label class="photo-label">Foto de la fecha<input type="file" id="datePhoto" accept="image/jpeg,image/png,image/webp" capture="environment"></label></div>
+        <button type="button" class="outline-button" id="analyzeBtn">Reconocer fotos</button><small id="photoStatus"></small>
+      </div>
+      <div class="form-grid">
+        <label class="full">Nombre del alimento<input name="name" id="itemName" placeholder="Ej. yogur natural" maxlength="100" required></label>
+        <label>Cantidad<input name="quantity" id="itemQuantity" type="number" min="0.01" max="10000" step="any" value="1" required></label>
+        <label>Unidad<select name="unit" id="itemUnit"><option value="ud">unidades</option><option value="g">gramos</option><option value="kg">kilos</option><option value="ml">mililitros</option><option value="l">litros</option></select></label>
+        <label>Fecha indicada<input name="expiry_date" id="itemDate" type="date" required></label>
+        <label>Tipo de fecha<select name="date_kind" id="itemDateKind"><option value="caducidad">Caducidad</option><option value="consumo_preferente">Consumo preferente</option></select></label>
+      </div>
+      <p class="form-note">Comprueba la fecha en el envase. La app no determina si un alimento es seguro para consumir.</p>
+      <div class="dialog-actions"><button type="button" class="ghost-button" id="cancelDialog">Cancelar</button><button type="submit" class="primary-button">Guardar alimento</button></div>
+    </form>
+  </dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "primero-esto",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": "./public", "binding": "ASSETS" },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "primero-esto",
+      "database_id": "c39c8ef4-0e93-4c83-b5b3-0b39044593e5"
+    }
+  ],
+  "ai": { "binding": "AI" },
+  "triggers": { "crons": ["0 8 * * *"] }
+}

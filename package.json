@@ -1,0 +1,19 @@
+{
+  "name": "primero-esto",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "db:local": "wrangler d1 execute primero-esto --local --file=schema.sql",
+    "db:remote": "wrangler d1 execute primero-esto --remote --file=schema.sql",
+    "check": "node --check src/worker.js && node --check public/app.js && node --check public/sw.js"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
