@@ -23,6 +23,7 @@ Frontend PWA servido por Cloudflare Workers. API en el mismo Worker. D1 guarda d
 7. Agrupar y filtrar los alimentos por la sección del supermercado.
 8. Consultar los alimentos agotados en una lista de la compra, apuntar otros productos y reponerlos con una nueva fecha.
 9. Consultar una despensa compartida sin cuenta; registrarse o iniciar sesión para poder modificar la propia.
+10. Recibir una sugerencia de uso orientativo para fruta o verdura reconocida, basada en el día de entrada al frigorífico, y corregirla antes o después de guardar.
 
 ## Proceso iterativo
 
@@ -30,6 +31,7 @@ Se definió primero el problema y el recorrido de la aplicación. Después se el
 Más tarde se añadió el registro de usuarios para abrir la misma despensa en cualquier dispositivo. La migración vincula la despensa de invitado a la cuenta y conserva alimentos y suscripciones de avisos. Se probaron registro, inicio de sesión en dos clientes, sincronización, cierre de sesión y enlaces compartidos. También se añadió la edición posterior de cada alimento. En la prueba de producción se descubrió que Workers limita PBKDF2 a 100 000 iteraciones por llamada; la derivación se dividió en dos pasadas consecutivas.
 Después se añadieron categorías de supermercado, agrupación y filtro. La migración asigna «Otros» a los alimentos existentes sin alterar sus demás datos; el usuario puede cambiarlos desde «Editar».
 La siguiente iteración añadió una lista de la compra: los alimentos agotados entran automáticamente y se pueden reponer en la despensa. El registro pasó a ser obligatorio para escribir. La API comprueba la sesión en cada operación de modificación; los enlaces compartidos dan acceso de solo lectura.
+Después se añadieron estimaciones de conservación para productos frescos concretos. La referencia es la guía de conservación de la Universidad de Maine. La fecha de entrada se guarda en D1 y la fecha resultante tiene un tipo propio, «Fecha orientativa», para distinguirla de la caducidad del envase. Las estimaciones son de frescura y no indican seguridad alimentaria; el usuario puede corregirlas.
 
 ## Retos y soluciones
 

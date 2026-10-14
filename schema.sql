@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS items (
   category TEXT NOT NULL DEFAULT 'otros',
   expiry_date TEXT NOT NULL,
   date_kind TEXT NOT NULL DEFAULT 'caducidad',
+  stored_on TEXT,
   status TEXT NOT NULL DEFAULT 'available',
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

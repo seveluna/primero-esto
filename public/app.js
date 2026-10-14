@@ -5,6 +5,21 @@ const categories = [
   ["charcuteria", "Charcutería"], ["lacteos_huevos", "Lácteos y huevos"], ["panaderia", "Panadería"],
   ["despensa", "Despensa"], ["congelados", "Congelados"], ["bebidas", "Bebidas"], ["otros", "Otros"]
 ];
+// Conservative quality estimates for whole produce kept in a home fridge (Maine Cooperative Extension).
+const produceLife = [
+  { names: /\b(fresa|frambuesa|mora|arandano)\b/, days: 2 },
+  { names: /\b(espinaca|acelga|rucula|canonigo)\b/, days: 2 },
+  { names: /\b(calabacin|calabaza de verano)\b/, days: 2 },
+  { names: /\b(brocoli)\b/, days: 3 },
+  { names: /\b(esparrago|judia verde|guisante|berenjena)\b/, days: 2 },
+  { names: /\b(lechuga)\b/, days: 5 },
+  { names: /\b(pepino)\b/, days: 5 },
+  { names: /\b(zanahoria|remolacha|rabano|nabo)\b/, days: 7 },
+  { names: /\b(pimiento)\b/, days: 10 },
+  { names: /\b(manzana)\b/, days: 21 },
+  { names: /\b(pera|melocoton|nectarina)\b/, days: 5 },
+  { names: /\b(cebolla tierna|cebolleta)\b/, days: 3 }
+];
 const recipes = [
   { name: "Tortilla de verduras", emoji: "🍳", ingredients: ["huevo", "calabacín", "cebolla"], description: "Saltea las verduras y cuájalas con huevo. Una cena rápida de aprovechamiento.", minutes: 20 },
   { name: "Ensalada de tomate y queso", emoji: "🥗", ingredients: ["tomate", "queso"], description: "Corta y mezcla los ingredientes. Añade aceite y especias al gusto.", minutes: 10 },
@@ -28,6 +43,7 @@ function todayIso() { return new Intl.DateTimeFormat("en-CA", { timeZone: "Europ
 function daysUntil(date) { return Math.round((Date.parse(`${date}T00:00:00Z`) - Date.parse(`${todayIso()}T00:00:00Z`)) / 86_400_000); }
 function prettyDate(date) { return new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "short", timeZone: "UTC" }).format(new Date(`${date}T00:00:00Z`)); }
 function dateAfter(days) { const date = new Date(`${todayIso()}T00:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); }
+function addDays(dateIso, days) { const date = new Date(`${dateIso}T00:00:00Z`); date.setUTCDate(date.getUTCDate() + days); return date.toISOString().slice(0, 10); }
 function toast(message) { const node = $("#toast"); node.textContent = message; node.classList.add("show"); clearTimeout(toast.timer); toast.timer = setTimeout(() => node.classList.remove("show"), 3400); }
 
 async function api(path, options = {}) {
@@ -125,6 +141,8 @@ function emojiFor(name) {
   return entries.find(([key]) => value.includes(key))?.[1] || "🥦";
 }
 
+function itemDateKind(item) { return item.date_kind === "estimacion" ? "Fecha orientativa" : item.date_kind === "consumo_preferente" ? "Consumo preferente" : "Caducidad"; }
+
 function dateLabel(item) {
   if (item.status === "consumed") return { text: "Agotado", cls: "" };
   if (item.status === "replenished") return { text: "Repuesto", cls: "" };
@@ -150,7 +168,7 @@ function renderItems() {
   );
   const itemRow = (item) => {
     const date = dateLabel(item);
-    return `<article class="item-row"><span class="item-glyph" aria-hidden="true">${emojiFor(item.name)}</span><div class="item-details"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.quantity)} ${escapeHtml(item.unit)} · ${item.date_kind === "consumo_preferente" ? "Consumo preferente" : "Caducidad"} ${prettyDate(item.expiry_date)}</small></div><span class="item-date ${date.cls}">${date.text}</span>${canEdit ? `<div class="item-actions"><button class="icon-button" data-action="edit" data-id="${item.id}" title="Editar" aria-label="Editar ${escapeHtml(item.name)}">✎</button>${item.status === "available" ? `<button class="icon-button" data-action="consume" data-id="${item.id}" title="Marcar como agotado" aria-label="Marcar ${escapeHtml(item.name)} como agotado">✓</button><button class="icon-button" data-action="discard" data-id="${item.id}" title="Descartar" aria-label="Descartar ${escapeHtml(item.name)}">×</button>` : item.status === "replenished" ? "" : `<button class="icon-button" data-action="restore" data-id="${item.id}" title="Restaurar" aria-label="Restaurar ${escapeHtml(item.name)}">↶</button>`}<button class="icon-button" data-action="delete" data-id="${item.id}" title="Eliminar" aria-label="Eliminar ${escapeHtml(item.name)}">⌫</button></div>` : ""}</article>`;
+    return `<article class="item-row"><span class="item-glyph" aria-hidden="true">${emojiFor(item.name)}</span><div class="item-details"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.quantity)} ${escapeHtml(item.unit)} · ${itemDateKind(item)} ${prettyDate(item.expiry_date)}</small></div><span class="item-date ${date.cls}">${date.text}</span>${canEdit ? `<div class="item-actions"><button class="icon-button" data-action="edit" data-id="${item.id}" title="Editar" aria-label="Editar ${escapeHtml(item.name)}">✎</button>${item.status === "available" ? `<button class="icon-button" data-action="consume" data-id="${item.id}" title="Marcar como agotado" aria-label="Marcar ${escapeHtml(item.name)} como agotado">✓</button><button class="icon-button" data-action="discard" data-id="${item.id}" title="Descartar" aria-label="Descartar ${escapeHtml(item.name)}">×</button>` : item.status === "replenished" ? "" : `<button class="icon-button" data-action="restore" data-id="${item.id}" title="Restaurar" aria-label="Restaurar ${escapeHtml(item.name)}">↶</button>`}<button class="icon-button" data-action="delete" data-id="${item.id}" title="Eliminar" aria-label="Eliminar ${escapeHtml(item.name)}">⌫</button></div>` : ""}</article>`;
   };
   const firstUse = !state.items.length && state.filter === "available" && state.categoryFilter === "all";
   $("#itemList").innerHTML = shown.length
@@ -212,11 +230,56 @@ function clearPantry() {
   renderRecipes();
 }
 
+let autoEstimated = false;
+
+function produceSuggestion() {
+  if ($("#itemCategory").value !== "frutas_verduras") return null;
+  const name = normalize($("#itemName").value);
+  if (!name) return null;
+  if (/\b(tomate|patata|cebolla|platano)\b/.test(name) && !/\b(cortado|troceado|pelado|picado)\b/.test(name))
+    return { note: "Este producto entero suele conservarse mejor fuera del frigo. Introduce una fecha manual si quieres seguirlo." };
+  if (/\b(cortado|troceado|pelado|picado)\b/.test(name)) return { days: /\btomate\b/.test(name) ? 2 : 3, note: "Producto cortado: guárdalo tapado y refrigerado." };
+  const found = produceLife.find((entry) => entry.names.test(name));
+  const note = /\b(pera|melocoton|nectarina|manzana)\b/.test(name)
+    ? "Cuando esté maduro, guárdalo entero en el cajón del frigo."
+    : /\b(fresa|frambuesa|mora|arandano)\b/.test(name)
+      ? "Guarda las bayas enteras y sin lavar; retira las piezas dañadas."
+      : "Estimación de frescura para el producto entero en el cajón del frigo.";
+  return found ? { days: found.days, note } : { note: "Aún no hay una estimación para este producto. Introduce la fecha manualmente." };
+}
+
+function applyProduceEstimate() {
+  const suggestion = produceSuggestion();
+  const start = $("#produceStartDate").value;
+  if (!suggestion?.days || !/^\d{4}-\d{2}-\d{2}$/.test(start)) return;
+  $("#itemDate").value = addDays(start, suggestion.days);
+  $("#itemDateKind").value = "estimacion";
+  autoEstimated = true;
+}
+
+function updateProduceEstimate() {
+  const suggestion = produceSuggestion();
+  $("#produceEstimate").hidden = !suggestion;
+  if (!suggestion) {
+    if (autoEstimated) { $("#itemDate").value = ""; $("#itemDateKind").value = "caducidad"; autoEstimated = false; }
+    return;
+  }
+  const days = suggestion.days;
+  $("#produceStartLabel").hidden = !days;
+  $("#produceEstimateText").textContent = days ? "Uso orientativo: " + days + (days === 1 ? " día" : " días") + " desde que lo guardaste. " + suggestion.note : suggestion.note;
+  $("#applyEstimateBtn").hidden = !days;
+  if (days && (autoEstimated || (!state.editId && !$("#itemDate").value))) applyProduceEstimate();
+  else if (!days && autoEstimated) { $("#itemDate").value = ""; $("#itemDateKind").value = "caducidad"; autoEstimated = false; }
+}
+
 function openDialog() {
   if (!requireAccount()) return;
   state.editId = null;
   state.shoppingId = null;
+  autoEstimated = false;
   $("#addForm").reset();
+  $("#produceStartDate").value = todayIso();
+  updateProduceEstimate();
   $("#itemDialogEyebrow").textContent = "NUEVO ALIMENTO";
   $("#itemDialogTitle").textContent = "Añadir a la despensa";
   $("#saveItemBtn").textContent = "Guardar alimento";
@@ -229,12 +292,15 @@ function openEdit(id) {
   if (!item) return toast("No se encontró el alimento");
   state.editId = id;
   state.shoppingId = null;
+  autoEstimated = false;
   $("#itemName").value = item.name;
   $("#itemQuantity").value = item.quantity;
   $("#itemUnit").value = item.unit;
   $("#itemCategory").value = item.category || "otros";
   $("#itemDate").value = item.expiry_date;
   $("#itemDateKind").value = item.date_kind;
+  $("#produceStartDate").value = item.stored_on || item.created_at?.slice(0, 10) || todayIso();
+  updateProduceEstimate();
   $("#itemDialogEyebrow").textContent = "ACTUALIZAR ALIMENTO";
   $("#itemDialogTitle").textContent = "Editar alimento";
   $("#saveItemBtn").textContent = "Guardar cambios";
@@ -254,6 +320,7 @@ function stockShoppingItem(id) {
   $("#itemUnit").value = item.unit;
   $("#itemCategory").value = item.category;
   $("#itemDate").value = "";
+  updateProduceEstimate();
   $("#itemDialogEyebrow").textContent = "DE LA COMPRA AL FRIGO";
   $("#itemDialogTitle").textContent = "Reponer alimento";
   $("#saveItemBtn").textContent = "Guardar en el frigo";
@@ -265,6 +332,7 @@ async function saveItem(event) {
   const form = event.currentTarget;
   const body = Object.fromEntries(new FormData(form).entries());
   body.quantity = Number(body.quantity);
+  body.stored_on = body.date_kind === "estimacion" ? $("#produceStartDate").value : null;
   const saveButton = form.querySelector('button[type="submit"]');
   saveButton.disabled = true;
   try {
@@ -357,6 +425,17 @@ function bindEvents() {
   $("#closeDialog").addEventListener("click", closeDialog);
   $("#cancelDialog").addEventListener("click", closeDialog);
   $("#addForm").addEventListener("submit", saveItem);
+  $("#itemName").addEventListener("input", () => {
+    const name = normalize($("#itemName").value);
+    if ($("#itemCategory").value === "otros" && (produceLife.some((entry) => entry.names.test(name)) || /\b(tomate|patata|cebolla|platano)\b/.test(name)))
+      $("#itemCategory").value = "frutas_verduras";
+    updateProduceEstimate();
+  });
+  $("#itemCategory").addEventListener("change", updateProduceEstimate);
+  $("#produceStartDate").addEventListener("change", updateProduceEstimate);
+  $("#applyEstimateBtn").addEventListener("click", applyProduceEstimate);
+  $("#itemDate").addEventListener("input", () => { autoEstimated = false; });
+  $("#itemDateKind").addEventListener("change", () => { autoEstimated = false; });
   $("#addShoppingBtn").addEventListener("click", () => { if (!requireAccount()) return; $("#shoppingForm").reset(); $("#shoppingDialog").showModal(); $("#shoppingForm input[name=name]").focus(); });
   $("#closeShopping").addEventListener("click", () => $("#shoppingDialog").close());
   $("#cancelShopping").addEventListener("click", () => $("#shoppingDialog").close());

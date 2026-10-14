@@ -7,6 +7,7 @@ Aplicación web para registrar alimentos del frigo, avisar antes de la fecha ind
 ## Funciones
 
 - Alta manual de alimentos con nombre, cantidad, unidad, fecha indicada y tipo de fecha.
+- Sugerencias de frescura para frutas y verduras reconocidas: la app calcula una fecha orientativa a partir del día en que se guardaron. Se puede cambiar manualmente y aparece diferenciada de la caducidad del envase. Para productos que se conservan mejor fuera del frigo, como el tomate entero, muestra un aviso en vez de inventar una fecha.
 - Edición posterior de los datos de cualquier alimento desde su fila en la despensa.
 - Clasificación por secciones de supermercado (frutas y verduras, carnicería, pescadería, charcutería, lácteos y huevos, panadería, despensa, congelados, bebidas y otros), con agrupación y filtro en la lista.
 - Registro e inicio de sesión con correo y contraseña. La cuenta conserva la despensa existente y permite abrirla en otros dispositivos. La página comprueba cambios cada 30 segundos mientras está abierta.
@@ -41,6 +42,7 @@ La configuración de D1 está en `wrangler.jsonc`. `npm run db:remote` aplica `s
 Para actualizar una base D1 creada antes de las cuentas, ejecutar `npx wrangler d1 execute primero-esto --remote --file=migrations/001_accounts.sql` antes del despliegue.
 Para añadir las categorías a una base existente, ejecutar después `npx wrangler d1 execute primero-esto --remote --file=migrations/002_categories.sql`. Los alimentos antiguos comienzan en «Otros» y se pueden reclasificar al editarlos.
 Para añadir la lista de la compra, ejecutar `npx wrangler d1 execute primero-esto --remote --file=migrations/003_shopping.sql`. La migración incorpora los alimentos ya marcados como agotados.
+Para guardar la fecha de entrada de frutas y verduras, ejecutar `npx wrangler d1 execute primero-esto --remote --file=migrations/004_produce_dates.sql`.
 
 ## Comprobaciones realizadas
 
@@ -51,9 +53,12 @@ Para añadir la lista de la compra, ejecutar `npx wrangler d1 execute primero-es
 - Registro con despensa existente, inicio de sesión en un segundo cliente, sincronización de datos, rechazo de contraseña incorrecta, cierre de sesión, enlaces compartidos y comprobación de origen de las solicitudes (en entorno local).
 - Rechazo de escrituras anónimas, vista de invitado sin acciones de edición y protección frente a escrituras en una despensa ajena mediante su enlace compartido.
 - Paso de agotados a la lista de la compra, reposición con nueva fecha y conservación del historial del producto antiguo.
+- Cálculo y edición de una fecha orientativa para fresas a partir de su entrada en el frigo, con etiqueta diferenciada en la despensa; aviso sin fecha automática para tomate entero.
 - Se probó el reconocimiento de fotos durante el desarrollo. Al no leer de forma fiable productos ni etiquetas, se retiró de esta versión.
 
 La incorporación mediante foto queda como posible función premium futura; no forma parte de la aplicación publicada.
+
+Las estimaciones de frutas y verduras son orientaciones de calidad basadas en la [guía de conservación de la Universidad de Maine](https://extension.umaine.edu/food-health/2025/05/29/storing-and-washing-fresh-fruits-and-vegetables/) y su [tabla de productos frescos](https://extension.umaine.edu/york/wp-content/uploads/sites/28/2018/03/Final-Storing-Chart-for-Fresh-Garden-Produce-1.pdf). Suponen fruta o verdura entera, guardada correctamente en un frigorífico a 4 °C o menos. Un producto cortado recibe una estimación distinta. Las sugerencias no determinan la seguridad del alimento.
 
 **Pendiente de prueba en un dispositivo real:** aceptar notificaciones, enviar el aviso de prueba y comprobar la entrega programada. El navegador sin interfaz usado para las pruebas negó la suscripción push aunque tenía permiso de notificaciones; no sirve para validar la recepción real. En iPhone hay que añadir la web a la pantalla de inicio para recibir web push.
 

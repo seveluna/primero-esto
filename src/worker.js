@@ -1,7 +1,7 @@
 import webpush from "web-push";
 
 const allowedStatuses = new Set(["available", "consumed", "discarded"]);
-const allowedDateKinds = new Set(["caducidad", "consumo_preferente"]);
+const allowedDateKinds = new Set(["caducidad", "consumo_preferente", "estimacion"]);
 const allowedCategories = new Set(["frutas_verduras", "carniceria", "pescaderia", "charcuteria", "lacteos_huevos", "panaderia", "despensa", "congelados", "bebidas", "otros"]);
 
 function json(data, status = 200, headers = {}) {
@@ -144,13 +144,17 @@ function validItem(body) {
   const category = String(body.category || "otros");
   const expiryDate = String(body.expiry_date || "");
   const dateKind = String(body.date_kind || "caducidad");
+  const storedOn = body.stored_on ? String(body.stored_on) : null;
   if (!name) throw new Error("Indica el nombre del alimento");
   if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 10000) throw new Error("Cantidad no válida");
   if (!unit) throw new Error("Indica la unidad");
   if (!allowedCategories.has(category)) throw new Error("Categoría no válida");
   if (!validDate(expiryDate)) throw new Error("Fecha no válida");
   if (!allowedDateKinds.has(dateKind)) throw new Error("Tipo de fecha no válido");
-  return { name, quantity, unit, category, expiryDate, dateKind };
+  if (storedOn && !validDate(storedOn)) throw new Error("Fecha de entrada no válida");
+  if (dateKind === "estimacion" && !storedOn) throw new Error("Fecha de entrada no válida: indica cuándo guardaste el alimento");
+  if (dateKind === "estimacion" && expiryDate < storedOn) throw new Error("Fecha orientativa no válida: debe ser posterior a la fecha de entrada");
+  return { name, quantity, unit, category, expiryDate, dateKind, storedOn };
 }
 
 function validShoppingItem(body) {
@@ -208,8 +212,8 @@ async function routeApi(request, env, url) {
     const item = validItem(await readJson(request));
     const id = crypto.randomUUID();
     const results = await env.DB.batch([
-      env.DB.prepare("INSERT INTO items (id, household_id, name, quantity, unit, category, expiry_date, date_kind) SELECT ?, household_id, ?, ?, ?, ?, ?, ? FROM shopping_items WHERE id = ? AND household_id = ?")
-        .bind(id, item.name, item.quantity, item.unit, item.category, item.expiryDate, item.dateKind, replenishMatch[1], hid),
+      env.DB.prepare("INSERT INTO items (id, household_id, name, quantity, unit, category, expiry_date, date_kind, stored_on) SELECT ?, household_id, ?, ?, ?, ?, ?, ?, ? FROM shopping_items WHERE id = ? AND household_id = ?")
+        .bind(id, item.name, item.quantity, item.unit, item.category, item.expiryDate, item.dateKind, item.storedOn, replenishMatch[1], hid),
       env.DB.prepare("UPDATE items SET status = 'replenished', updated_at = CURRENT_TIMESTAMP WHERE id = (SELECT source_item_id FROM shopping_items WHERE id = ? AND household_id = ?) AND household_id = ? AND status = 'consumed'")
         .bind(replenishMatch[1], hid, hid),
       env.DB.prepare("DELETE FROM shopping_items WHERE id = ? AND household_id = ?").bind(replenishMatch[1], hid)
@@ -230,22 +234,22 @@ async function routeApi(request, env, url) {
   }
 
   if (url.pathname === "/api/items" && request.method === "GET") {
-    const result = await env.DB.prepare("SELECT id, name, quantity, unit, category, expiry_date, date_kind, status, created_at FROM items WHERE household_id = ? ORDER BY status, expiry_date, created_at DESC").bind(hid).all();
+    const result = await env.DB.prepare("SELECT id, name, quantity, unit, category, expiry_date, date_kind, stored_on, status, created_at FROM items WHERE household_id = ? ORDER BY status, expiry_date, created_at DESC").bind(hid).all();
     return json({ items: result.results });
   }
   if (url.pathname === "/api/items" && request.method === "POST") {
     const item = validItem(await readJson(request));
     const id = crypto.randomUUID();
-    await env.DB.prepare("INSERT INTO items (id, household_id, name, quantity, unit, category, expiry_date, date_kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-      .bind(id, hid, item.name, item.quantity, item.unit, item.category, item.expiryDate, item.dateKind).run();
+    await env.DB.prepare("INSERT INTO items (id, household_id, name, quantity, unit, category, expiry_date, date_kind, stored_on) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+      .bind(id, hid, item.name, item.quantity, item.unit, item.category, item.expiryDate, item.dateKind, item.storedOn).run();
     return json({ id }, 201);
   }
   const itemMatch = url.pathname.match(/^\/api\/items\/([a-f0-9-]{36})$/);
   if (itemMatch && request.method === "PUT") {
     const item = validItem(await readJson(request));
     const results = await env.DB.batch([
-      env.DB.prepare("UPDATE items SET name = ?, quantity = ?, unit = ?, category = ?, expiry_date = ?, date_kind = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND household_id = ?")
-        .bind(item.name, item.quantity, item.unit, item.category, item.expiryDate, item.dateKind, itemMatch[1], hid),
+      env.DB.prepare("UPDATE items SET name = ?, quantity = ?, unit = ?, category = ?, expiry_date = ?, date_kind = ?, stored_on = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND household_id = ?")
+        .bind(item.name, item.quantity, item.unit, item.category, item.expiryDate, item.dateKind, item.storedOn, itemMatch[1], hid),
       env.DB.prepare("UPDATE shopping_items SET name = ?, quantity = ?, unit = ?, category = ? WHERE source_item_id = ? AND household_id = ?")
         .bind(item.name, item.quantity, item.unit, item.category, itemMatch[1], hid)
     ]);

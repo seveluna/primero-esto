@@ -15,6 +15,7 @@ Plataforma de desarrollo: Codex. Los siguientes mensajes de la persona participa
 11. «Los alimentos podrán categorizarse como están en el supermercado».
 12. «Debe de haber un lugar donde encontrar los productos agotados en el frigo que sirva como lista de la compra».
 13. «Si un usuario no está registrado no debería de poder añadir alimentos».
+14. «Como controlamos la fecha de caducidad de verduras y frutas? Podría haber un tiempo estimado de vida en el frigo según el alimento que sea».
 
 Decisiones solicitadas mediante preguntas en la misma sesión:
 

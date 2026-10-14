@@ -98,9 +98,14 @@
         <label>Unidad<select name="unit" id="itemUnit"><option value="ud">unidades</option><option value="g">gramos</option><option value="kg">kilos</option><option value="ml">mililitros</option><option value="l">litros</option></select></label>
         <label class="full">Sección del supermercado<select name="category" id="itemCategory"><option value="frutas_verduras">Frutas y verduras</option><option value="carniceria">Carnicería</option><option value="pescaderia">Pescadería</option><option value="charcuteria">Charcutería</option><option value="lacteos_huevos">Lácteos y huevos</option><option value="panaderia">Panadería</option><option value="despensa">Despensa</option><option value="congelados">Congelados</option><option value="bebidas">Bebidas</option><option value="otros" selected>Otros</option></select></label>
         <label>Fecha indicada<input name="expiry_date" id="itemDate" type="date" required></label>
-        <label>Tipo de fecha<select name="date_kind" id="itemDateKind"><option value="caducidad">Caducidad</option><option value="consumo_preferente">Consumo preferente</option></select></label>
+        <label>Tipo de fecha<select name="date_kind" id="itemDateKind"><option value="caducidad">Caducidad</option><option value="consumo_preferente">Consumo preferente</option><option value="estimacion">Fecha orientativa</option></select></label>
       </div>
-      <p class="form-note">Comprueba la fecha en el envase. La app no determina si un alimento es seguro para consumir.</p>
+      <div class="produce-estimate" id="produceEstimate" hidden>
+        <label id="produceStartLabel">Fecha en que lo guardaste<input id="produceStartDate" type="date"></label>
+        <p id="produceEstimateText"></p>
+        <button type="button" class="outline-button" id="applyEstimateBtn" hidden>Usar fecha orientativa</button>
+      </div>
+      <p class="form-note">Las fechas orientativas indican cuándo conviene usar frutas y verduras para conservar su calidad; no son fechas de caducidad ni garantizan su seguridad. Comprueba siempre el estado del alimento y la fecha del envase, si la tiene. Fuente: <a href="https://extension.umaine.edu/food-health/2025/05/29/storing-and-washing-fresh-fruits-and-vegetables/" target="_blank" rel="noopener noreferrer">Universidad de Maine</a>.</p>
       <div class="dialog-actions"><button type="button" class="ghost-button" id="cancelDialog">Cancelar</button><button type="submit" class="primary-button" id="saveItemBtn">Guardar alimento</button></div>
     </form>
   </dialog>
