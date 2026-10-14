@@ -15,7 +15,8 @@
     <header class="topbar">
       <a class="brand" href="/" aria-label="Primero esto, inicio"><span class="brand-icon">✳</span><span>primero esto</span></a>
       <div class="top-actions">
-        <button type="button" class="ghost-button" id="shareBtn" title="Copiar un enlace para abrir esta despensa en otro dispositivo">Compartir despensa</button>
+        <button type="button" class="ghost-button" id="shareBtn" title="Copiar un enlace para compartir esta despensa">Compartir</button>
+        <button type="button" class="outline-button" id="accountBtn">Mi cuenta</button>
         <button type="button" class="primary-button small" id="addTopBtn">+ Añadir alimento</button>
       </div>
     </header>
@@ -30,6 +31,7 @@
             <button type="button" class="primary-button" id="addHeroBtn">Añadir a mi despensa <span aria-hidden="true">↗</span></button>
             <a class="text-link" href="#recipes">Ver recetas <span aria-hidden="true">→</span></a>
           </div>
+          <p class="account-prompt" id="accountPrompt">Crea una cuenta para conservar y sincronizar tu despensa en todos tus dispositivos. <button type="button" id="registerLink">Crear cuenta</button></p>
         </div>
         <div class="hero-visual" aria-hidden="true">
           <div class="visual-orbit orbit-one"></div><div class="visual-orbit orbit-two"></div>
@@ -55,6 +57,7 @@
             <button class="filter" data-filter="all">Todos</button>
             <button class="filter" data-filter="consumed">Aprovechados</button>
           </div>
+          <label class="category-filter-label">Sección del supermercado <select id="categoryFilter"><option value="all">Todas las secciones</option><option value="frutas_verduras">Frutas y verduras</option><option value="carniceria">Carnicería</option><option value="pescaderia">Pescadería</option><option value="charcuteria">Charcutería</option><option value="lacteos_huevos">Lácteos y huevos</option><option value="panaderia">Panadería</option><option value="despensa">Despensa</option><option value="congelados">Congelados</option><option value="bebidas">Bebidas</option><option value="otros">Otros</option></select></label>
           <div id="itemList" class="item-list"><p class="loading">Cargando despensa…</p></div>
         </div>
         <aside class="side-column">
@@ -82,17 +85,39 @@
 
   <dialog id="addDialog" class="add-dialog">
     <form id="addForm" method="dialog">
-      <div class="dialog-heading"><div><p class="eyebrow">NUEVO ALIMENTO</p><h2>Añadir a la despensa</h2></div><button type="button" class="close-button" id="closeDialog" aria-label="Cerrar">×</button></div>
+      <div class="dialog-heading"><div><p class="eyebrow" id="itemDialogEyebrow">NUEVO ALIMENTO</p><h2 id="itemDialogTitle">Añadir a la despensa</h2></div><button type="button" class="close-button" id="closeDialog" aria-label="Cerrar">×</button></div>
       <div class="form-grid">
         <label class="full">Nombre del alimento<input name="name" id="itemName" placeholder="Ej. yogur natural" maxlength="100" required></label>
         <label>Cantidad<input name="quantity" id="itemQuantity" type="number" min="0.01" max="10000" step="any" value="1" required></label>
         <label>Unidad<select name="unit" id="itemUnit"><option value="ud">unidades</option><option value="g">gramos</option><option value="kg">kilos</option><option value="ml">mililitros</option><option value="l">litros</option></select></label>
+        <label class="full">Sección del supermercado<select name="category" id="itemCategory"><option value="frutas_verduras">Frutas y verduras</option><option value="carniceria">Carnicería</option><option value="pescaderia">Pescadería</option><option value="charcuteria">Charcutería</option><option value="lacteos_huevos">Lácteos y huevos</option><option value="panaderia">Panadería</option><option value="despensa">Despensa</option><option value="congelados">Congelados</option><option value="bebidas">Bebidas</option><option value="otros" selected>Otros</option></select></label>
         <label>Fecha indicada<input name="expiry_date" id="itemDate" type="date" required></label>
         <label>Tipo de fecha<select name="date_kind" id="itemDateKind"><option value="caducidad">Caducidad</option><option value="consumo_preferente">Consumo preferente</option></select></label>
       </div>
       <p class="form-note">Comprueba la fecha en el envase. La app no determina si un alimento es seguro para consumir.</p>
-      <div class="dialog-actions"><button type="button" class="ghost-button" id="cancelDialog">Cancelar</button><button type="submit" class="primary-button">Guardar alimento</button></div>
+      <div class="dialog-actions"><button type="button" class="ghost-button" id="cancelDialog">Cancelar</button><button type="submit" class="primary-button" id="saveItemBtn">Guardar alimento</button></div>
     </form>
+  </dialog>
+  <dialog id="authDialog" class="add-dialog auth-dialog">
+    <div class="auth-content">
+      <div class="dialog-heading"><div><p class="eyebrow">TU DESPENSA EN CUALQUIER DISPOSITIVO</p><h2 id="authTitle">Crear cuenta</h2></div><button type="button" class="close-button" id="closeAuth" aria-label="Cerrar">×</button></div>
+      <div id="authSignedOut">
+        <p id="authIntro">Los alimentos que ya tienes en este navegador se guardarán en tu cuenta.</p>
+        <form id="authForm" class="auth-form">
+          <label>Correo electrónico<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
+          <label>Contraseña<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>
+          <p class="form-note" id="passwordHint">Usa al menos 12 caracteres. Guarda tu contraseña: todavía no hay recuperación por correo.</p>
+          <button type="submit" class="primary-button" id="authSubmit">Crear cuenta</button>
+        </form>
+        <button type="button" class="auth-switch" id="authSwitch">¿Ya tienes cuenta? Inicia sesión</button>
+      </div>
+      <div id="authSignedIn" hidden>
+        <p>Sesión iniciada como <strong id="accountEmail"></strong>.</p>
+        <p>Tu despensa se guarda y sincroniza con tu cuenta. En otro dispositivo, entra con el mismo correo y contraseña.</p>
+        <button type="button" class="outline-button" id="ownPantryBtn" hidden>Volver a mi despensa</button>
+        <button type="button" class="ghost-button" id="logoutBtn">Cerrar sesión</button>
+      </div>
+    </div>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script type="module" src="/app.js"></script>

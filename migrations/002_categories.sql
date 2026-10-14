@@ -1,0 +1,1 @@
+ALTER TABLE items ADD COLUMN category TEXT NOT NULL DEFAULT 'otros';

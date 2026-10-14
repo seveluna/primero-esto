@@ -7,7 +7,10 @@ Aplicación web para registrar alimentos del frigo, avisar antes de la fecha ind
 ## Funciones
 
 - Alta manual de alimentos con nombre, cantidad, unidad, fecha indicada y tipo de fecha.
-- Despensa compartible mediante enlace secreto, con estado disponible, consumido o descartado.
+- Edición posterior de los datos de cualquier alimento desde su fila en la despensa.
+- Clasificación por secciones de supermercado (frutas y verduras, carnicería, pescadería, charcutería, lácteos y huevos, panadería, despensa, congelados, bebidas y otros), con agrupación y filtro en la lista.
+- Registro e inicio de sesión con correo y contraseña. La cuenta conserva la despensa existente y permite abrirla en otros dispositivos. La página comprueba cambios cada 30 segundos mientras está abierta.
+- Despensa compartible mediante enlace secreto, con estado disponible, consumido o descartado. Los enlaces de invitación dan acceso a quien los tenga.
 - Avisos web push 3 días antes, 1 día antes y el mismo día de la fecha. Una tarea diaria a las 08:00 UTC revisa D1 y evita duplicados.
 - Recetas de un catálogo local ordenadas según ingredientes disponibles y urgencia. Muestra ingredientes que faltan. Los productos consumidos, descartados o con fecha pasada no se usan para proponer recetas.
 - Datos de ejemplo para que el jurado pueda probar la app sin introducir información real.
@@ -15,11 +18,11 @@ Aplicación web para registrar alimentos del frigo, avisar antes de la fecha ind
 ## Arquitectura
 
 - **Cloudflare Worker:** API y lógica de avisos.
-- **Cloudflare D1:** alimentos, despensas, suscripciones push y registro de avisos enviados.
+- **Cloudflare D1:** alimentos, despensas, cuentas, sesiones, suscripciones push y registro de avisos enviados.
 - **Assets estáticos y PWA:** interfaz HTML/CSS/JavaScript, manifest y service worker para recibir notificaciones.
 - **Web Push con VAPID:** envía avisos incluso con la app cerrada, siempre que el navegador y el dispositivo permitan push y la persona haya concedido permiso.
 
-La despensa se identifica con una clave aleatoria de 256 bits. El servidor guarda solo su hash SHA-256. Quien tenga el enlace compartido puede acceder a esa despensa; no hay cuentas ni contraseñas en esta versión.
+Las contraseñas se derivan en dos pasadas de PBKDF2-SHA-256 de 100 000 iteraciones cada una, con sal aleatoria; no se guardan en texto claro. La sesión usa una cookie segura y HttpOnly de 30 días. Al registrar una despensa de invitado, su clave anterior se invalida. Quien tenga un nuevo enlace compartido puede acceder a esa despensa. Esta versión aún no verifica el correo ni ofrece recuperación de contraseña.
 
 ## Desarrollo local
 
@@ -34,6 +37,8 @@ npm run dev
 ```
 
 La configuración de D1 está en `wrangler.jsonc`. `npm run db:remote` aplica `schema.sql` a la base remota. `npm run deploy` publica la app. Las tres variables VAPID se guardan como secretos de Cloudflare y `.dev.vars` queda fuera de Git.
+Para actualizar una base D1 creada antes de las cuentas, ejecutar `npx wrangler d1 execute primero-esto --remote --file=migrations/001_accounts.sql` antes del despliegue.
+Para añadir las categorías a una base existente, ejecutar después `npx wrangler d1 execute primero-esto --remote --file=migrations/002_categories.sql`. Los alimentos antiguos comienzan en «Otros» y se pueden reclasificar al editarlos.
 
 ## Comprobaciones realizadas
 
@@ -41,6 +46,7 @@ La configuración de D1 está en `wrangler.jsonc`. `npm run db:remote` aplica `s
 - Alta, consulta y cambio de estado de alimentos en D1 local.
 - Recorrido de alta en móvil y aparición de recetas.
 - Acceso a la URL pública, alta y consulta en D1 remoto, clave pública de push.
+- Registro con despensa existente, inicio de sesión en un segundo cliente, sincronización de datos, rechazo de contraseña incorrecta, cierre de sesión, enlaces compartidos y comprobación de origen de las solicitudes (en entorno local).
 - Se probó el reconocimiento de fotos durante el desarrollo. Al no leer de forma fiable productos ni etiquetas, se retiró de esta versión.
 
 La incorporación mediante foto queda como posible función premium futura; no forma parte de la aplicación publicada.

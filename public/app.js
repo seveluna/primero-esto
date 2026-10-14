@@ -1,5 +1,10 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { token: "", items: [], filter: "available" };
+const state = { token: "", user: null, authMode: "register", editId: null, items: [], filter: "available", categoryFilter: "all" };
+const categories = [
+  ["frutas_verduras", "Frutas y verduras"], ["carniceria", "Carnicería"], ["pescaderia", "Pescadería"],
+  ["charcuteria", "Charcutería"], ["lacteos_huevos", "Lácteos y huevos"], ["panaderia", "Panadería"],
+  ["despensa", "Despensa"], ["congelados", "Congelados"], ["bebidas", "Bebidas"], ["otros", "Otros"]
+];
 const recipes = [
   { name: "Tortilla de verduras", emoji: "🍳", ingredients: ["huevo", "calabacín", "cebolla"], description: "Saltea las verduras y cuájalas con huevo. Una cena rápida de aprovechamiento.", minutes: 20 },
   { name: "Ensalada de tomate y queso", emoji: "🥗", ingredients: ["tomate", "queso"], description: "Corta y mezcla los ingredientes. Añade aceite y especias al gusto.", minutes: 10 },
@@ -44,6 +49,70 @@ async function ensureHousehold() {
   }
 }
 
+function renderAuth() {
+  const signedIn = Boolean(state.user);
+  $("#accountPrompt").hidden = signedIn;
+  $("#accountBtn").textContent = signedIn ? "Mi cuenta ✓" : "Entrar / registro";
+  $("#authSignedOut").hidden = signedIn;
+  $("#authSignedIn").hidden = !signedIn;
+  if (signedIn) $("#accountEmail").textContent = state.user.email;
+  $("#ownPantryBtn").hidden = !state.token;
+}
+
+function setAuthMode(mode) {
+  state.authMode = mode;
+  $("#authTitle").textContent = mode === "register" ? "Crear cuenta" : "Iniciar sesión";
+  $("#authIntro").textContent = mode === "register" ? "Los alimentos que ya tienes en este navegador se guardarán en tu cuenta." : "Abre tu despensa guardada desde cualquier dispositivo.";
+  $("#authSubmit").textContent = mode === "register" ? "Crear cuenta" : "Entrar";
+  $("#authSwitch").textContent = mode === "register" ? "¿Ya tienes cuenta? Inicia sesión" : "¿Aún no tienes cuenta? Regístrate";
+  $("#passwordHint").hidden = mode !== "register";
+  $("#authForm input[name=password]").minLength = mode === "register" ? 12 : 1;
+  $("#authForm input[name=password]").autocomplete = mode === "register" ? "new-password" : "current-password";
+}
+
+function openAuth(mode = "register") {
+  setAuthMode(mode);
+  renderAuth();
+  $("#authDialog").showModal();
+  if (!state.user) $("#authForm input[name=email]").focus();
+}
+
+async function submitAuth(event) {
+  event.preventDefault();
+  const button = $("#authSubmit");
+  const fields = Object.fromEntries(new FormData(event.currentTarget).entries());
+  button.disabled = true;
+  try {
+    const body = { ...fields, ...(state.authMode === "register" && state.token ? { guest_token: state.token } : {}) };
+    const data = await api(`/api/auth/${state.authMode === "register" ? "register" : "login"}`, { method: "POST", body: JSON.stringify(body) });
+    state.user = data.user;
+    state.token = "";
+    localStorage.removeItem("primero-esto-household");
+    if (location.hash.startsWith("#h=")) history.replaceState(null, "", location.pathname + location.search);
+    $("#authForm").reset();
+    $("#authDialog").close();
+    renderAuth();
+    await refresh();
+    toast(state.authMode === "register" ? "Cuenta creada. Tu despensa está sincronizada." : "Has entrado en tu despensa.");
+  } catch (error) { toast(error.message); }
+  finally { button.disabled = false; }
+}
+
+async function logout() {
+  try {
+    await api("/api/auth/logout", { method: "POST" });
+    state.user = null;
+    state.token = "";
+    localStorage.removeItem("primero-esto-household");
+    if (location.hash.startsWith("#h=")) history.replaceState(null, "", location.pathname + location.search);
+    $("#authDialog").close();
+    await ensureHousehold();
+    await refresh();
+    renderAuth();
+    toast("Sesión cerrada. Entra de nuevo para recuperar tu despensa.");
+  } catch (error) { toast(error.message); }
+}
+
 function emojiFor(name) {
   const value = normalize(name);
   const entries = [["tomate","🍅"],["huevo","🥚"],["queso","🧀"],["leche","🥛"],["yogur","🥛"],["zanahoria","🥕"],["aguacate","🥑"],["pan","🍞"],["platano","🍌"],["manzana","🍎"],["fresa","🍓"],["pimiento","🫑"],["champi","🍄"],["patata","🥔"],["arroz","🍚"],["pasta","🍝"],["cebolla","🧅"],["lechuga","🥬"]];
@@ -67,11 +136,21 @@ function renderItems() {
   $("#countAvailable").textContent = available.length;
   $("#countSoon").textContent = available.filter((item) => daysUntil(item.expiry_date) >= 0 && daysUntil(item.expiry_date) <= 3).length;
   $("#countUsed").textContent = used.length;
-  const shown = state.items.filter((item) => state.filter === "all" || (state.filter === "consumed" ? item.status === "consumed" : item.status === "available"));
-  $("#itemList").innerHTML = shown.length ? shown.map((item) => {
+  const shown = state.items.filter((item) =>
+    (state.filter === "all" || (state.filter === "consumed" ? item.status === "consumed" : item.status === "available")) &&
+    (state.categoryFilter === "all" || item.category === state.categoryFilter)
+  );
+  const itemRow = (item) => {
     const date = dateLabel(item);
-    return `<article class="item-row"><span class="item-glyph" aria-hidden="true">${emojiFor(item.name)}</span><div class="item-details"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.quantity)} ${escapeHtml(item.unit)} · ${item.date_kind === "consumo_preferente" ? "Consumo preferente" : "Caducidad"} ${prettyDate(item.expiry_date)}</small></div><span class="item-date ${date.cls}">${date.text}</span><div class="item-actions">${item.status === "available" ? `<button class="icon-button" data-action="consume" data-id="${item.id}" title="Marcar como consumido" aria-label="Marcar ${escapeHtml(item.name)} como consumido">✓</button><button class="icon-button" data-action="discard" data-id="${item.id}" title="Descartar" aria-label="Descartar ${escapeHtml(item.name)}">×</button>` : `<button class="icon-button" data-action="restore" data-id="${item.id}" title="Restaurar" aria-label="Restaurar ${escapeHtml(item.name)}">↶</button>`}<button class="icon-button" data-action="delete" data-id="${item.id}" title="Eliminar" aria-label="Eliminar ${escapeHtml(item.name)}">⌫</button></div></article>`;
-  }).join("") : `<div class="empty-state"><span class="empty-icon">${state.filter === "available" ? "🧺" : "✳"}</span><strong>${state.filter === "available" ? "Tu despensa empieza aquí" : "No hay alimentos en esta vista"}</strong><p>${state.filter === "available" ? "Añade un alimento y su fecha para empezar a aprovecharlo." : "Prueba con otro filtro."}</p>${state.filter === "available" ? '<button class="primary-button" id="addEmptyBtn">Añadir alimento</button><button class="sample-button" id="sampleBtn">Probar con datos de ejemplo</button>' : ""}</div>`;
+    return `<article class="item-row"><span class="item-glyph" aria-hidden="true">${emojiFor(item.name)}</span><div class="item-details"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.quantity)} ${escapeHtml(item.unit)} · ${item.date_kind === "consumo_preferente" ? "Consumo preferente" : "Caducidad"} ${prettyDate(item.expiry_date)}</small></div><span class="item-date ${date.cls}">${date.text}</span><div class="item-actions"><button class="icon-button" data-action="edit" data-id="${item.id}" title="Editar" aria-label="Editar ${escapeHtml(item.name)}">✎</button>${item.status === "available" ? `<button class="icon-button" data-action="consume" data-id="${item.id}" title="Marcar como consumido" aria-label="Marcar ${escapeHtml(item.name)} como consumido">✓</button><button class="icon-button" data-action="discard" data-id="${item.id}" title="Descartar" aria-label="Descartar ${escapeHtml(item.name)}">×</button>` : `<button class="icon-button" data-action="restore" data-id="${item.id}" title="Restaurar" aria-label="Restaurar ${escapeHtml(item.name)}">↶</button>`}<button class="icon-button" data-action="delete" data-id="${item.id}" title="Eliminar" aria-label="Eliminar ${escapeHtml(item.name)}">⌫</button></div></article>`;
+  };
+  const firstUse = !state.items.length && state.filter === "available" && state.categoryFilter === "all";
+  $("#itemList").innerHTML = shown.length
+    ? categories.map(([id, label]) => {
+      const inCategory = shown.filter((item) => (item.category || "otros") === id);
+      return inCategory.length ? `<section class="category-group"><h3>${label} <span>${inCategory.length}</span></h3>${inCategory.map(itemRow).join("")}</section>` : "";
+    }).join("")
+    : `<div class="empty-state"><span class="empty-icon">${firstUse ? "🧺" : "✳"}</span><strong>${firstUse ? "Tu despensa empieza aquí" : "No hay alimentos en esta sección"}</strong><p>${firstUse ? "Añade un alimento y su fecha para empezar a aprovecharlo." : "Prueba con otra sección o filtro."}</p>${firstUse ? '<button class="primary-button" id="addEmptyBtn">Añadir alimento</button><button class="sample-button" id="sampleBtn">Probar con datos de ejemplo</button>' : ""}</div>`;
 }
 
 function ingredientMatch(ingredient, items) {
@@ -100,8 +179,32 @@ async function refresh() {
   renderRecipes();
 }
 
-function openDialog() { $("#addDialog").showModal(); $("#itemName").focus(); }
-function closeDialog() { $("#addDialog").close(); }
+function openDialog() {
+  state.editId = null;
+  $("#addForm").reset();
+  $("#itemDialogEyebrow").textContent = "NUEVO ALIMENTO";
+  $("#itemDialogTitle").textContent = "Añadir a la despensa";
+  $("#saveItemBtn").textContent = "Guardar alimento";
+  $("#addDialog").showModal();
+  $("#itemName").focus();
+}
+function openEdit(id) {
+  const item = state.items.find((entry) => entry.id === id);
+  if (!item) return toast("No se encontró el alimento");
+  state.editId = id;
+  $("#itemName").value = item.name;
+  $("#itemQuantity").value = item.quantity;
+  $("#itemUnit").value = item.unit;
+  $("#itemCategory").value = item.category || "otros";
+  $("#itemDate").value = item.expiry_date;
+  $("#itemDateKind").value = item.date_kind;
+  $("#itemDialogEyebrow").textContent = "ACTUALIZAR ALIMENTO";
+  $("#itemDialogTitle").textContent = "Editar alimento";
+  $("#saveItemBtn").textContent = "Guardar cambios";
+  $("#addDialog").showModal();
+  $("#itemName").focus();
+}
+function closeDialog() { $("#addDialog").close(); state.editId = null; }
 
 async function saveItem(event) {
   event.preventDefault();
@@ -111,14 +214,16 @@ async function saveItem(event) {
   const saveButton = form.querySelector('button[type="submit"]');
   saveButton.disabled = true;
   try {
-    await api("/api/items", { method: "POST", body: JSON.stringify(body) });
-    form.reset(); closeDialog(); await refresh(); toast("Alimento añadido a tu despensa");
+    const editing = Boolean(state.editId);
+    await api(editing ? `/api/items/${state.editId}` : "/api/items", { method: editing ? "PUT" : "POST", body: JSON.stringify(body) });
+    form.reset(); closeDialog(); await refresh(); toast(editing ? "Alimento actualizado" : "Alimento añadido a tu despensa");
   } catch (error) { toast(error.message); }
   finally { saveButton.disabled = false; }
 }
 
 async function itemAction(button) {
   const { action, id } = button.dataset;
+  if (action === "edit") return openEdit(id);
   if (action === "delete" && !confirm("¿Eliminar este alimento de la despensa?")) return;
   button.disabled = true;
   try {
@@ -130,11 +235,11 @@ async function itemAction(button) {
 
 async function loadSample() {
   const samples = [
-    { name: "Tomate", quantity: 3, unit: "ud", expiry_date: dateAfter(1), date_kind: "caducidad" },
-    { name: "Queso fresco", quantity: 1, unit: "ud", expiry_date: dateAfter(2), date_kind: "caducidad" },
-    { name: "Pan", quantity: 1, unit: "ud", expiry_date: dateAfter(2), date_kind: "consumo_preferente" },
-    { name: "Huevos", quantity: 4, unit: "ud", expiry_date: dateAfter(4), date_kind: "consumo_preferente" },
-    { name: "Calabacín", quantity: 2, unit: "ud", expiry_date: dateAfter(1), date_kind: "caducidad" }
+    { name: "Tomate", quantity: 3, unit: "ud", category: "frutas_verduras", expiry_date: dateAfter(1), date_kind: "caducidad" },
+    { name: "Queso fresco", quantity: 1, unit: "ud", category: "lacteos_huevos", expiry_date: dateAfter(2), date_kind: "caducidad" },
+    { name: "Pan", quantity: 1, unit: "ud", category: "panaderia", expiry_date: dateAfter(2), date_kind: "consumo_preferente" },
+    { name: "Huevos", quantity: 4, unit: "ud", category: "lacteos_huevos", expiry_date: dateAfter(4), date_kind: "consumo_preferente" },
+    { name: "Calabacín", quantity: 2, unit: "ud", category: "frutas_verduras", expiry_date: dateAfter(1), date_kind: "caducidad" }
   ];
   try { for (const item of samples) await api("/api/items", { method: "POST", body: JSON.stringify(item) }); await refresh(); toast("Datos de ejemplo añadidos"); }
   catch (error) { toast(error.message); }
@@ -169,8 +274,29 @@ function bindEvents() {
   $("#addForm").addEventListener("submit", saveItem);
   $("#notifyBtn").addEventListener("click", activateNotifications);
   $("#testNotifyBtn").addEventListener("click", async () => { try { await api("/api/push/test", { method: "POST" }); toast("Aviso de prueba enviado"); } catch (error) { toast(error.message); } });
-  $("#shareBtn").addEventListener("click", async () => { try { await navigator.clipboard.writeText(`${location.origin}/#h=${state.token}`); toast("Enlace copiado. Cualquiera con él puede acceder a esta despensa."); } catch { toast("No se pudo copiar el enlace"); } });
+  $("#shareBtn").addEventListener("click", async () => {
+    try {
+      const token = state.token || (await api("/api/share", { method: "POST" })).token;
+      await navigator.clipboard.writeText(`${location.origin}/#h=${token}`);
+      toast("Enlace copiado. Cualquiera con él puede acceder a esta despensa.");
+    } catch (error) { toast(`No se pudo copiar el enlace: ${error.message}`); }
+  });
+  $("#accountBtn").addEventListener("click", () => openAuth(state.user ? "register" : "login"));
+  $("#registerLink").addEventListener("click", () => openAuth("register"));
+  $("#closeAuth").addEventListener("click", () => $("#authDialog").close());
+  $("#authDialog").addEventListener("click", (event) => { if (event.target === $("#authDialog")) $("#authDialog").close(); });
+  $("#authForm").addEventListener("submit", submitAuth);
+  $("#authSwitch").addEventListener("click", () => setAuthMode(state.authMode === "register" ? "login" : "register"));
+  $("#logoutBtn").addEventListener("click", logout);
+  $("#ownPantryBtn").addEventListener("click", async () => {
+    state.token = "";
+    if (location.hash.startsWith("#h=")) history.replaceState(null, "", location.pathname + location.search);
+    $("#authDialog").close();
+    renderAuth();
+    try { await refresh(); } catch (error) { toast(error.message); }
+  });
   document.querySelectorAll(".filter").forEach((button) => button.addEventListener("click", () => { state.filter = button.dataset.filter; document.querySelectorAll(".filter").forEach((node) => node.classList.toggle("active", node === button)); renderItems(); }));
+  $("#categoryFilter").addEventListener("change", (event) => { state.categoryFilter = event.target.value; renderItems(); });
   $("#addDialog").addEventListener("click", (event) => { if (event.target === $("#addDialog")) closeDialog(); });
 }
 
@@ -178,8 +304,17 @@ async function init() {
   bindEvents();
   $("#todayLabel").textContent = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Madrid" }).format(new Date());
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
-  try { await ensureHousehold(); await refresh(); }
+  try {
+    const { user } = await api("/api/auth/me");
+    state.user = user;
+    const incoming = location.hash.match(/^#h=([a-f0-9]{64})$/)?.[1];
+    if (user && !incoming) { state.token = ""; localStorage.removeItem("primero-esto-household"); }
+    else await ensureHousehold();
+    renderAuth();
+    await refresh();
+  }
   catch (error) { $("#itemList").innerHTML = `<div class="empty-state"><strong>No se pudo cargar la despensa</strong><p>${escapeHtml(error.message)}</p></div>`; toast(error.message); }
+  setInterval(() => { if (!document.hidden) refresh().catch(() => {}); }, 30000);
 }
 
 init();

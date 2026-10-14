@@ -10,6 +10,9 @@ Plataforma de desarrollo: Codex. Los siguientes mensajes de la persona participa
 6. «Existe alguna solución más económica que Firebase?»
 7. «Pues vamos con Cloudflare».
 8. «El tema de subir la imagen lo vamos a quitar por ahora porque no reconoce la imagen ni los textos. A lo mejor lo ponemos como algo premiujm en un futuro».
+9. «Necesito que haya alta de usuarios para que el usuario pueda abrir su despensa en cualquier dispositiva y esta se quede guardada y sioncronizada».
+10. «Los productos deben poder editarse a posteriori también».
+11. «Los alimentos podrán categorizarse como están en el supermercado».
 
 Decisiones solicitadas mediante preguntas en la misma sesión:
 
