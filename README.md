@@ -6,7 +6,7 @@ Aplicación web para registrar alimentos del frigo, avisar antes de la fecha ind
 
 ## Funciones
 
-- Alta de alimentos por formulario o mediante foto del producto y su etiqueta. Workers AI sugiere nombre y fecha; la persona confirma los datos antes de guardarlos. Las fotos no se conservan.
+- Alta manual de alimentos con nombre, cantidad, unidad, fecha indicada y tipo de fecha.
 - Despensa compartible mediante enlace secreto, con estado disponible, consumido o descartado.
 - Avisos web push 3 días antes, 1 día antes y el mismo día de la fecha. Una tarea diaria a las 08:00 UTC revisa D1 y evita duplicados.
 - Recetas de un catálogo local ordenadas según ingredientes disponibles y urgencia. Muestra ingredientes que faltan. Los productos consumidos, descartados o con fecha pasada no se usan para proponer recetas.
@@ -16,7 +16,6 @@ Aplicación web para registrar alimentos del frigo, avisar antes de la fecha ind
 
 - **Cloudflare Worker:** API y lógica de avisos.
 - **Cloudflare D1:** alimentos, despensas, suscripciones push y registro de avisos enviados.
-- **Cloudflare Workers AI:** lectura asistida de fotografías mediante `@cf/moondream/moondream3.1-9B-A2B`, limitada a 30 análisis diarios para controlar el uso gratuito.
 - **Assets estáticos y PWA:** interfaz HTML/CSS/JavaScript, manifest y service worker para recibir notificaciones.
 - **Web Push con VAPID:** envía avisos incluso con la app cerrada, siempre que el navegador y el dispositivo permitan push y la persona haya concedido permiso.
 
@@ -42,7 +41,9 @@ La configuración de D1 está en `wrangler.jsonc`. `npm run db:remote` aplica `s
 - Alta, consulta y cambio de estado de alimentos en D1 local.
 - Recorrido de alta en móvil y aparición de recetas.
 - Acceso a la URL pública, alta y consulta en D1 remoto, clave pública de push.
-- Lectura de una etiqueta de prueba por Workers AI. El reconocimiento de fecha ha variado entre intentos, por lo que la revisión humana es obligatoria.
+- Se probó el reconocimiento de fotos durante el desarrollo. Al no leer de forma fiable productos ni etiquetas, se retiró de esta versión.
+
+La incorporación mediante foto queda como posible función premium futura; no forma parte de la aplicación publicada.
 
 **Pendiente de prueba en un dispositivo real:** aceptar notificaciones, enviar el aviso de prueba y comprobar la entrega programada. El navegador sin interfaz usado para las pruebas negó la suscripción push aunque tenía permiso de notificaciones; no sirve para validar la recepción real. En iPhone hay que añadir la web a la pantalla de inicio para recibir web push.
 

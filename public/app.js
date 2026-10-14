@@ -71,7 +71,7 @@ function renderItems() {
   $("#itemList").innerHTML = shown.length ? shown.map((item) => {
     const date = dateLabel(item);
     return `<article class="item-row"><span class="item-glyph" aria-hidden="true">${emojiFor(item.name)}</span><div class="item-details"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.quantity)} ${escapeHtml(item.unit)} · ${item.date_kind === "consumo_preferente" ? "Consumo preferente" : "Caducidad"} ${prettyDate(item.expiry_date)}</small></div><span class="item-date ${date.cls}">${date.text}</span><div class="item-actions">${item.status === "available" ? `<button class="icon-button" data-action="consume" data-id="${item.id}" title="Marcar como consumido" aria-label="Marcar ${escapeHtml(item.name)} como consumido">✓</button><button class="icon-button" data-action="discard" data-id="${item.id}" title="Descartar" aria-label="Descartar ${escapeHtml(item.name)}">×</button>` : `<button class="icon-button" data-action="restore" data-id="${item.id}" title="Restaurar" aria-label="Restaurar ${escapeHtml(item.name)}">↶</button>`}<button class="icon-button" data-action="delete" data-id="${item.id}" title="Eliminar" aria-label="Eliminar ${escapeHtml(item.name)}">⌫</button></div></article>`;
-  }).join("") : `<div class="empty-state"><span class="empty-icon">${state.filter === "available" ? "🧺" : "✳"}</span><strong>${state.filter === "available" ? "Tu despensa empieza aquí" : "No hay alimentos en esta vista"}</strong><p>${state.filter === "available" ? "Añade un producto con una foto o escribe sus datos para empezar a aprovecharlo." : "Prueba con otro filtro."}</p>${state.filter === "available" ? '<button class="primary-button" id="addEmptyBtn">Añadir alimento</button><button class="sample-button" id="sampleBtn">Probar con datos de ejemplo</button>' : ""}</div>`;
+  }).join("") : `<div class="empty-state"><span class="empty-icon">${state.filter === "available" ? "🧺" : "✳"}</span><strong>${state.filter === "available" ? "Tu despensa empieza aquí" : "No hay alimentos en esta vista"}</strong><p>${state.filter === "available" ? "Añade un alimento y su fecha para empezar a aprovecharlo." : "Prueba con otro filtro."}</p>${state.filter === "available" ? '<button class="primary-button" id="addEmptyBtn">Añadir alimento</button><button class="sample-button" id="sampleBtn">Probar con datos de ejemplo</button>' : ""}</div>`;
 }
 
 function ingredientMatch(ingredient, items) {
@@ -103,25 +103,6 @@ async function refresh() {
 function openDialog() { $("#addDialog").showModal(); $("#itemName").focus(); }
 function closeDialog() { $("#addDialog").close(); }
 
-async function analyzePhotos() {
-  const files = [{ file: $("#productPhoto").files[0], kind: "product" }, { file: $("#datePhoto").files[0], kind: "date" }].filter(({ file }) => Boolean(file));
-  if (!files.length) return toast("Selecciona al menos una foto");
-  $("#analyzeBtn").disabled = true;
-  $("#photoStatus").textContent = "Leyendo fotos…";
-  let recognized = 0;
-  try {
-    for (const { file, kind } of files) {
-      const form = new FormData(); form.append("image", file); form.append("kind", kind);
-      const result = await api("/api/photo", { method: "POST", body: form });
-      if (result.name && !$("#itemName").value) { $("#itemName").value = result.name; recognized++; }
-      if (result.expiry_date && !$("#itemDate").value) { $("#itemDate").value = result.expiry_date; recognized++; }
-      if (result.date_kind) $("#itemDateKind").value = result.date_kind;
-    }
-    $("#photoStatus").textContent = recognized ? "Comprueba y corrige los datos antes de guardar." : "No se pudo leer con claridad. Introduce los datos a mano.";
-  } catch (error) { $("#photoStatus").textContent = `No se pudo reconocer la foto: ${error.message}. Puedes rellenar los datos a mano.`; }
-  finally { $("#analyzeBtn").disabled = false; }
-}
-
 async function saveItem(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -131,7 +112,7 @@ async function saveItem(event) {
   saveButton.disabled = true;
   try {
     await api("/api/items", { method: "POST", body: JSON.stringify(body) });
-    form.reset(); $("#photoStatus").textContent = ""; closeDialog(); await refresh(); toast("Alimento añadido a tu despensa");
+    form.reset(); closeDialog(); await refresh(); toast("Alimento añadido a tu despensa");
   } catch (error) { toast(error.message); }
   finally { saveButton.disabled = false; }
 }
@@ -186,7 +167,6 @@ function bindEvents() {
   $("#closeDialog").addEventListener("click", closeDialog);
   $("#cancelDialog").addEventListener("click", closeDialog);
   $("#addForm").addEventListener("submit", saveItem);
-  $("#analyzeBtn").addEventListener("click", analyzePhotos);
   $("#notifyBtn").addEventListener("click", activateNotifications);
   $("#testNotifyBtn").addEventListener("click", async () => { try { await api("/api/push/test", { method: "POST" }); toast("Aviso de prueba enviado"); } catch (error) { toast(error.message); } });
   $("#shareBtn").addEventListener("click", async () => { try { await navigator.clipboard.writeText(`${location.origin}/#h=${state.token}`); toast("Enlace copiado. Cualquiera con él puede acceder a esta despensa."); } catch { toast("No se pudo copiar el enlace"); } });

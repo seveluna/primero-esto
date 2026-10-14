@@ -9,6 +9,7 @@ Plataforma de desarrollo: Codex. Los siguientes mensajes de la persona participa
 5. A la pregunta sobre el tipo de foto: «Productos y etiquetas».
 6. «Existe alguna solución más económica que Firebase?»
 7. «Pues vamos con Cloudflare».
+8. «El tema de subir la imagen lo vamos a quitar por ahora porque no reconoce la imagen ni los textos. A lo mejor lo ponemos como algo premiujm en un futuro».
 
 Decisiones solicitadas mediante preguntas en la misma sesión:
 

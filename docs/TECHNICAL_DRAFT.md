@@ -2,7 +2,7 @@
 
 ## Descripción
 
-«Primero esto» ayuda a gestionar los alimentos del frigo. La persona fotografía el producto y su etiqueta, confirma nombre y fecha, recibe avisos al aproximarse esa fecha y ve recetas basadas en los alimentos aún disponibles. También puede añadir productos manualmente, marcarlos como consumidos o descartados y probar la aplicación con datos de ejemplo.
+«Primero esto» ayuda a gestionar los alimentos del frigo. La persona registra cada producto y su fecha en un formulario, recibe avisos al aproximarse esa fecha y ve recetas basadas en los alimentos aún disponibles. También puede marcarlos como consumidos o descartados y probar la aplicación con datos de ejemplo.
 
 ## Plataforma utilizada
 
@@ -10,28 +10,29 @@ Codex para desarrollar el proyecto mediante instrucciones en lenguaje natural. C
 
 ## Arquitectura
 
-Frontend PWA servido por Cloudflare Workers. API en el mismo Worker. D1 guarda `households`, `items`, `push_subscriptions`, `notification_events` y `photo_usage`. Workers AI procesa temporalmente las fotos. La tarea Cron revisa las fechas a diario y Web Push envía los avisos a los dispositivos suscritos. Las recetas se calculan en el navegador con un catálogo local y priorizan coincidencias completas e ingredientes próximos a su fecha.
+Frontend PWA servido por Cloudflare Workers. API en el mismo Worker. D1 guarda `households`, `items`, `push_subscriptions` y `notification_events`. La tarea Cron revisa las fechas a diario y Web Push envía los avisos a los dispositivos suscritos. Las recetas se calculan en el navegador con un catálogo local y priorizan coincidencias completas e ingredientes próximos a su fecha.
 
 ## Casos de uso
 
 1. Registrar un alimento con nombre, cantidad, unidad, fecha y tipo de fecha.
-2. Fotografiar el producto y/o la etiqueta para rellenar parte del formulario y confirmar la sugerencia.
-3. Ver alimentos próximos a su fecha y recibir un aviso push.
-4. Marcar un producto como consumido o descartado, de modo que deje de sugerirse en recetas.
-5. Consultar recetas completas o aquellas a las que les falta algún ingrediente.
-6. Compartir una despensa mediante un enlace secreto.
+2. Ver alimentos próximos a su fecha y recibir un aviso push.
+3. Marcar un producto como consumido o descartado, de modo que deje de sugerirse en recetas.
+4. Consultar recetas completas o aquellas a las que les falta algún ingrediente.
+5. Compartir una despensa mediante un enlace secreto.
 
 ## Proceso iterativo
 
-Se definió primero el problema y el recorrido de la aplicación. Después se eligió Cloudflare por sus cuotas gratuitas. Codex generó la estructura del Worker, esquema D1, interfaz, reconocimiento de fotos, catálogo de recetas y notificaciones. En pruebas de navegador se detectó que el formulario no se cerraba tras guardar; se corrigió conservando la referencia al formulario antes de la operación asíncrona. En pruebas con una etiqueta sintética se vio que el modelo a veces omitía la fecha o confundía el tipo de fecha; se reforzó la pregunta y se mantuvo la confirmación humana.
+Se definió primero el problema y el recorrido de la aplicación. Después se eligió Cloudflare por sus cuotas gratuitas. Codex generó la estructura del Worker, esquema D1, interfaz, catálogo de recetas y notificaciones. En pruebas de navegador se detectó que el formulario no se cerraba tras guardar; se corrigió conservando la referencia al formulario antes de la operación asíncrona. También se exploró el alta mediante fotos, pero las pruebas mostraron que no reconocía con fiabilidad productos ni textos de las etiquetas. A petición de la persona participante se retiró esa función del formulario, la API y la configuración de Cloudflare.
 
 ## Retos y soluciones
 
-- **Fechas pequeñas en etiquetas:** el reconocimiento visual no es infalible. La app nunca guarda automáticamente el resultado de la foto; se exige confirmación en el formulario.
+- **Precisión del registro:** el usuario introduce y comprueba los datos de la etiqueta en el formulario.
 - **Avisos con la app cerrada:** service worker, suscripción Web Push, claves VAPID y tarea Cron diaria.
-- **Coste:** las fotos no se almacenan y el análisis se limita a 30 llamadas al día.
+- **Coste:** el MVP utiliza Worker y D1, sin invocaciones de IA para fotos.
 - **Prueba rápida por el jurado:** botón de datos de ejemplo.
+
+La incorporación mediante foto se considera una posible función premium futura, pendiente de lograr una lectura fiable. No está incluida en esta versión.
 
 ## Capturas pendientes
 
-Insertar capturas de la pantalla inicial, formulario de foto, despensa con productos, recetas y aviso push probado en dispositivo real.
+Insertar capturas de la pantalla inicial, formulario manual, despensa con productos, recetas y aviso push probado en dispositivo real.

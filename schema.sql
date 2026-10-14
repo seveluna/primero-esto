@@ -34,8 +34,3 @@ CREATE TABLE IF NOT EXISTS notification_events (
   sent_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (item_id, days_before)
 );
-
-CREATE TABLE IF NOT EXISTS photo_usage (
-  day TEXT PRIMARY KEY,
-  uses INTEGER NOT NULL DEFAULT 0
-);
