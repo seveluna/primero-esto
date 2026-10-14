@@ -30,8 +30,9 @@
           <div class="hero-actions">
             <button type="button" class="primary-button" id="addHeroBtn">Añadir a mi despensa <span aria-hidden="true">↗</span></button>
             <a class="text-link" href="#recipes">Ver recetas <span aria-hidden="true">→</span></a>
+            <a class="text-link" href="#shopping">Lista de la compra <span aria-hidden="true">→</span></a>
           </div>
-          <p class="account-prompt" id="accountPrompt">Crea una cuenta para conservar y sincronizar tu despensa en todos tus dispositivos. <button type="button" id="registerLink">Crear cuenta</button></p>
+          <p class="account-prompt" id="accountPrompt">Para añadir alimentos necesitas una cuenta. Así podrás conservar y sincronizar tu despensa en todos tus dispositivos. <button type="button" id="registerLink">Crear cuenta</button></p>
         </div>
         <div class="hero-visual" aria-hidden="true">
           <div class="visual-orbit orbit-one"></div><div class="visual-orbit orbit-two"></div>
@@ -45,7 +46,7 @@
         <div class="stat-grid">
           <div class="stat-card"><span class="stat-icon green">✦</span><strong id="countAvailable">0</strong><span>disponibles</span></div>
           <div class="stat-card"><span class="stat-icon orange">◷</span><strong id="countSoon">0</strong><span>próximos a su fecha</span></div>
-          <div class="stat-card"><span class="stat-icon cream">✓</span><strong id="countUsed">0</strong><span>aprovechados</span></div>
+          <div class="stat-card"><span class="stat-icon cream">✓</span><strong id="countUsed">0</strong><span>agotados</span></div>
         </div>
       </section>
 
@@ -55,7 +56,7 @@
           <div class="filters" role="group" aria-label="Filtrar alimentos">
             <button class="filter active" data-filter="available">Disponibles</button>
             <button class="filter" data-filter="all">Todos</button>
-            <button class="filter" data-filter="consumed">Aprovechados</button>
+            <button class="filter" data-filter="consumed">Agotados</button>
           </div>
           <label class="category-filter-label">Sección del supermercado <select id="categoryFilter"><option value="all">Todas las secciones</option><option value="frutas_verduras">Frutas y verduras</option><option value="carniceria">Carnicería</option><option value="pescaderia">Pescadería</option><option value="charcuteria">Charcutería</option><option value="lacteos_huevos">Lácteos y huevos</option><option value="panaderia">Panadería</option><option value="despensa">Despensa</option><option value="congelados">Congelados</option><option value="bebidas">Bebidas</option><option value="otros">Otros</option></select></label>
           <div id="itemList" class="item-list"><p class="loading">Cargando despensa…</p></div>
@@ -70,8 +71,13 @@
             <button type="button" class="test-button" id="testNotifyBtn">Enviar aviso de prueba</button>
             <small id="notifyStatus">Tu navegador te pedirá permiso.</small>
           </div>
-          <div class="tip-card"><span class="tip-icon">✳</span><h3>Un pequeño gesto, una gran diferencia</h3><p>Marca lo que ya has consumido para que las recetas usen solo los alimentos disponibles.</p></div>
+          <div class="tip-card"><span class="tip-icon">✳</span><h3>Un pequeño gesto, una gran diferencia</h3><p>Marca como agotado lo que hayas terminado. Pasará a tu lista de la compra y dejará de aparecer en las recetas.</p></div>
         </aside>
+      </section>
+
+      <section class="shopping-section" id="shopping">
+        <div class="section-heading"><div><p class="eyebrow">PARA LA PRÓXIMA COMPRA</p><h2>Lista de la compra <span id="shoppingCount" class="shopping-count">0</span></h2><p class="section-subtitle">Lo que se agota en tu frigo aparece aquí. También puedes apuntar otros productos.</p></div><button type="button" class="outline-button" id="addShoppingBtn">+ Apuntar producto</button></div>
+        <div id="shoppingList" class="shopping-panel"><p class="loading">Cargando lista…</p></div>
       </section>
 
       <section class="recipe-section" id="recipes">
@@ -98,11 +104,23 @@
       <div class="dialog-actions"><button type="button" class="ghost-button" id="cancelDialog">Cancelar</button><button type="submit" class="primary-button" id="saveItemBtn">Guardar alimento</button></div>
     </form>
   </dialog>
+  <dialog id="shoppingDialog" class="add-dialog shopping-dialog">
+    <form id="shoppingForm">
+      <div class="dialog-heading"><div><p class="eyebrow">LISTA DE LA COMPRA</p><h2>Apuntar producto</h2></div><button type="button" class="close-button" id="closeShopping" aria-label="Cerrar">×</button></div>
+      <div class="form-grid">
+        <label class="full">Producto<input name="name" placeholder="Ej. leche" maxlength="100" required></label>
+        <label>Cantidad<input name="quantity" type="number" min="0.01" max="10000" step="any" value="1" required></label>
+        <label>Unidad<select name="unit"><option value="ud">unidades</option><option value="g">gramos</option><option value="kg">kilos</option><option value="ml">mililitros</option><option value="l">litros</option></select></label>
+        <label class="full">Sección del supermercado<select name="category"><option value="frutas_verduras">Frutas y verduras</option><option value="carniceria">Carnicería</option><option value="pescaderia">Pescadería</option><option value="charcuteria">Charcutería</option><option value="lacteos_huevos">Lácteos y huevos</option><option value="panaderia">Panadería</option><option value="despensa">Despensa</option><option value="congelados">Congelados</option><option value="bebidas">Bebidas</option><option value="otros" selected>Otros</option></select></label>
+      </div>
+      <div class="dialog-actions"><button type="button" class="ghost-button" id="cancelShopping">Cancelar</button><button type="submit" class="primary-button">Añadir a la lista</button></div>
+    </form>
+  </dialog>
   <dialog id="authDialog" class="add-dialog auth-dialog">
     <div class="auth-content">
       <div class="dialog-heading"><div><p class="eyebrow">TU DESPENSA EN CUALQUIER DISPOSITIVO</p><h2 id="authTitle">Crear cuenta</h2></div><button type="button" class="close-button" id="closeAuth" aria-label="Cerrar">×</button></div>
       <div id="authSignedOut">
-        <p id="authIntro">Los alimentos que ya tienes en este navegador se guardarán en tu cuenta.</p>
+        <p id="authIntro">Crea una cuenta para guardar y sincronizar tu despensa.</p>
         <form id="authForm" class="auth-form">
           <label>Correo electrónico<input name="email" type="email" autocomplete="email" maxlength="254" required></label>
           <label>Contraseña<input name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required></label>

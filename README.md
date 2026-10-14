@@ -10,10 +10,11 @@ Aplicación web para registrar alimentos del frigo, avisar antes de la fecha ind
 - Edición posterior de los datos de cualquier alimento desde su fila en la despensa.
 - Clasificación por secciones de supermercado (frutas y verduras, carnicería, pescadería, charcutería, lácteos y huevos, panadería, despensa, congelados, bebidas y otros), con agrupación y filtro en la lista.
 - Registro e inicio de sesión con correo y contraseña. La cuenta conserva la despensa existente y permite abrirla en otros dispositivos. La página comprueba cambios cada 30 segundos mientras está abierta.
-- Despensa compartible mediante enlace secreto, con estado disponible, consumido o descartado. Los enlaces de invitación dan acceso a quien los tenga.
+- Solo las personas con cuenta e inicio de sesión pueden añadir, editar o cambiar el estado de alimentos y productos de la compra. Las despensas compartidas mediante enlace secreto se pueden consultar sin cuenta, pero son de solo lectura.
+- Lista de la compra con los alimentos agotados, agrupada por sección del supermercado. Permite apuntar productos manualmente, marcarlos como comprados y devolverlos al frigo con una nueva fecha.
 - Avisos web push 3 días antes, 1 día antes y el mismo día de la fecha. Una tarea diaria a las 08:00 UTC revisa D1 y evita duplicados.
 - Recetas de un catálogo local ordenadas según ingredientes disponibles y urgencia. Muestra ingredientes que faltan. Los productos consumidos, descartados o con fecha pasada no se usan para proponer recetas.
-- Datos de ejemplo para que el jurado pueda probar la app sin introducir información real.
+- Datos de ejemplo para que el jurado pueda probar la app desde una cuenta sin introducir alimentos reales.
 
 ## Arquitectura
 
@@ -39,6 +40,7 @@ npm run dev
 La configuración de D1 está en `wrangler.jsonc`. `npm run db:remote` aplica `schema.sql` a la base remota. `npm run deploy` publica la app. Las tres variables VAPID se guardan como secretos de Cloudflare y `.dev.vars` queda fuera de Git.
 Para actualizar una base D1 creada antes de las cuentas, ejecutar `npx wrangler d1 execute primero-esto --remote --file=migrations/001_accounts.sql` antes del despliegue.
 Para añadir las categorías a una base existente, ejecutar después `npx wrangler d1 execute primero-esto --remote --file=migrations/002_categories.sql`. Los alimentos antiguos comienzan en «Otros» y se pueden reclasificar al editarlos.
+Para añadir la lista de la compra, ejecutar `npx wrangler d1 execute primero-esto --remote --file=migrations/003_shopping.sql`. La migración incorpora los alimentos ya marcados como agotados.
 
 ## Comprobaciones realizadas
 
@@ -47,6 +49,8 @@ Para añadir las categorías a una base existente, ejecutar después `npx wrangl
 - Recorrido de alta en móvil y aparición de recetas.
 - Acceso a la URL pública, alta y consulta en D1 remoto, clave pública de push.
 - Registro con despensa existente, inicio de sesión en un segundo cliente, sincronización de datos, rechazo de contraseña incorrecta, cierre de sesión, enlaces compartidos y comprobación de origen de las solicitudes (en entorno local).
+- Rechazo de escrituras anónimas, vista de invitado sin acciones de edición y protección frente a escrituras en una despensa ajena mediante su enlace compartido.
+- Paso de agotados a la lista de la compra, reposición con nueva fecha y conservación del historial del producto antiguo.
 - Se probó el reconocimiento de fotos durante el desarrollo. Al no leer de forma fiable productos ni etiquetas, se retiró de esta versión.
 
 La incorporación mediante foto queda como posible función premium futura; no forma parte de la aplicación publicada.

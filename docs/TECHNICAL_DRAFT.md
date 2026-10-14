@@ -2,7 +2,7 @@
 
 ## Descripción
 
-«Primero esto» ayuda a gestionar los alimentos del frigo. La persona registra cada producto y su fecha en un formulario, recibe avisos al aproximarse esa fecha y ve recetas basadas en los alimentos aún disponibles. Puede crear una cuenta para conservar y sincronizar su despensa entre dispositivos, marcar productos como consumidos o descartados y probar la aplicación con datos de ejemplo.
+«Primero esto» ayuda a gestionar los alimentos del frigo. Una persona registrada anota cada producto y su fecha en un formulario, recibe avisos al aproximarse esa fecha y ve recetas basadas en los alimentos aún disponibles. Puede sincronizar su despensa entre dispositivos y pasar los productos agotados a una lista de la compra.
 
 ## Plataforma utilizada
 
@@ -21,12 +21,15 @@ Frontend PWA servido por Cloudflare Workers. API en el mismo Worker. D1 guarda d
 5. Compartir una despensa mediante un enlace secreto.
 6. Crear una cuenta con la despensa actual e iniciar sesión desde otro dispositivo para consultar los mismos alimentos.
 7. Agrupar y filtrar los alimentos por la sección del supermercado.
+8. Consultar los alimentos agotados en una lista de la compra, apuntar otros productos y reponerlos con una nueva fecha.
+9. Consultar una despensa compartida sin cuenta; registrarse o iniciar sesión para poder modificar la propia.
 
 ## Proceso iterativo
 
 Se definió primero el problema y el recorrido de la aplicación. Después se eligió Cloudflare por sus cuotas gratuitas. Codex generó la estructura del Worker, esquema D1, interfaz, catálogo de recetas y notificaciones. En pruebas de navegador se detectó que el formulario no se cerraba tras guardar; se corrigió conservando la referencia al formulario antes de la operación asíncrona. También se exploró el alta mediante fotos, pero las pruebas mostraron que no reconocía con fiabilidad productos ni textos de las etiquetas. A petición de la persona participante se retiró esa función del formulario, la API y la configuración de Cloudflare.
 Más tarde se añadió el registro de usuarios para abrir la misma despensa en cualquier dispositivo. La migración vincula la despensa de invitado a la cuenta y conserva alimentos y suscripciones de avisos. Se probaron registro, inicio de sesión en dos clientes, sincronización, cierre de sesión y enlaces compartidos. También se añadió la edición posterior de cada alimento. En la prueba de producción se descubrió que Workers limita PBKDF2 a 100 000 iteraciones por llamada; la derivación se dividió en dos pasadas consecutivas.
 Después se añadieron categorías de supermercado, agrupación y filtro. La migración asigna «Otros» a los alimentos existentes sin alterar sus demás datos; el usuario puede cambiarlos desde «Editar».
+La siguiente iteración añadió una lista de la compra: los alimentos agotados entran automáticamente y se pueden reponer en la despensa. El registro pasó a ser obligatorio para escribir. La API comprueba la sesión en cada operación de modificación; los enlaces compartidos dan acceso de solo lectura.
 
 ## Retos y soluciones
 

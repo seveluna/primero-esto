@@ -88,7 +88,8 @@ async function authRoute(request, env, url) {
     const guestToken = String(body.guest_token || "");
     const guestId = /^[a-f0-9]{64}$/.test(guestToken) ? await hashToken(guestToken) : null;
     const guest = guestId && await env.DB.prepare("SELECT id FROM households WHERE id = ? AND NOT EXISTS (SELECT 1 FROM claimed_households WHERE household_id = id)").bind(guestId).first();
-    if (guestId && !guest) return fail("No se pudo vincular la despensa actual. Actualiza la página e inténtalo de nuevo.", 409);
+    if (guestId && !guest && !await env.DB.prepare("SELECT 1 FROM household_links WHERE token_hash = ?").bind(guestId).first())
+      return fail("No se pudo vincular la despensa actual. Actualiza la página e inténtalo de nuevo.", 409);
     const household = guest?.id || randomToken();
     const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
     const passHash = await passwordHash(password, salt);
@@ -152,6 +153,18 @@ function validItem(body) {
   return { name, quantity, unit, category, expiryDate, dateKind };
 }
 
+function validShoppingItem(body) {
+  const name = String(body.name || "").trim().slice(0, 100);
+  const quantity = Number(body.quantity ?? 1);
+  const unit = String(body.unit || "ud").trim().slice(0, 20);
+  const category = String(body.category || "otros");
+  if (!name) throw new Error("Indica el nombre del producto");
+  if (!Number.isFinite(quantity) || quantity <= 0 || quantity > 10000) throw new Error("Cantidad no válida");
+  if (!unit) throw new Error("Indica la unidad");
+  if (!allowedCategories.has(category)) throw new Error("Categoría no válida");
+  return { name, quantity, unit, category };
+}
+
 function safeEndpoint(endpoint) {
   try {
     const url = new URL(endpoint);
@@ -164,12 +177,6 @@ function safeEndpoint(endpoint) {
 async function routeApi(request, env, url) {
   const authResponse = await authRoute(request, env, url);
   if (authResponse) return authResponse;
-  if (url.pathname === "/api/household" && request.method === "POST") {
-    const token = randomToken();
-    const id = await hashToken(token);
-    await env.DB.prepare("INSERT INTO households (id) VALUES (?)").bind(id).run();
-    return json({ token }, 201);
-  }
 
   if (url.pathname === "/api/share" && request.method === "POST") {
     const user = await sessionUser(request, env);
@@ -179,8 +186,48 @@ async function routeApi(request, env, url) {
     return json({ token }, 201);
   }
 
-  const hid = await householdId(request, env);
+  const readOnly = ["GET", "HEAD"].includes(request.method);
+  const user = await sessionUser(request, env);
+  if (!readOnly && !user) return fail("Crea una cuenta o inicia sesión para modificar la despensa", 401);
+  const hid = readOnly ? await householdId(request, env) : user.household_id;
   if (!hid) return fail("Despensa no encontrada. Crea una nueva o abre tu enlace compartido.", 401);
+
+  if (url.pathname === "/api/shopping" && request.method === "GET") {
+    const result = await env.DB.prepare("SELECT id, source_item_id, name, quantity, unit, category, checked, created_at FROM shopping_items WHERE household_id = ? ORDER BY checked, category, created_at DESC").bind(hid).all();
+    return json({ items: result.results });
+  }
+  if (url.pathname === "/api/shopping" && request.method === "POST") {
+    const item = validShoppingItem(await readJson(request));
+    const id = crypto.randomUUID();
+    await env.DB.prepare("INSERT INTO shopping_items (id, household_id, name, quantity, unit, category) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(id, hid, item.name, item.quantity, item.unit, item.category).run();
+    return json({ id }, 201);
+  }
+  const replenishMatch = url.pathname.match(/^\/api\/shopping\/([a-f0-9-]{36})\/replenish$/);
+  if (replenishMatch && request.method === "POST") {
+    const item = validItem(await readJson(request));
+    const id = crypto.randomUUID();
+    const results = await env.DB.batch([
+      env.DB.prepare("INSERT INTO items (id, household_id, name, quantity, unit, category, expiry_date, date_kind) SELECT ?, household_id, ?, ?, ?, ?, ?, ? FROM shopping_items WHERE id = ? AND household_id = ?")
+        .bind(id, item.name, item.quantity, item.unit, item.category, item.expiryDate, item.dateKind, replenishMatch[1], hid),
+      env.DB.prepare("UPDATE items SET status = 'replenished', updated_at = CURRENT_TIMESTAMP WHERE id = (SELECT source_item_id FROM shopping_items WHERE id = ? AND household_id = ?) AND household_id = ? AND status = 'consumed'")
+        .bind(replenishMatch[1], hid, hid),
+      env.DB.prepare("DELETE FROM shopping_items WHERE id = ? AND household_id = ?").bind(replenishMatch[1], hid)
+    ]);
+    return results[0].meta.changes ? json({ id }, 201) : fail("Producto no encontrado", 404);
+  }
+  const shoppingMatch = url.pathname.match(/^\/api\/shopping\/([a-f0-9-]{36})$/);
+  if (shoppingMatch && request.method === "PATCH") {
+    const body = await readJson(request);
+    if (typeof body.checked !== "boolean") return fail("Estado no válido");
+    const result = await env.DB.prepare("UPDATE shopping_items SET checked = ? WHERE id = ? AND household_id = ?")
+      .bind(Number(body.checked), shoppingMatch[1], hid).run();
+    return result.meta.changes ? json({ ok: true }) : fail("Producto no encontrado", 404);
+  }
+  if (shoppingMatch && request.method === "DELETE") {
+    const result = await env.DB.prepare("DELETE FROM shopping_items WHERE id = ? AND household_id = ?").bind(shoppingMatch[1], hid).run();
+    return result.meta.changes ? json({ ok: true }) : fail("Producto no encontrado", 404);
+  }
 
   if (url.pathname === "/api/items" && request.method === "GET") {
     const result = await env.DB.prepare("SELECT id, name, quantity, unit, category, expiry_date, date_kind, status, created_at FROM items WHERE household_id = ? ORDER BY status, expiry_date, created_at DESC").bind(hid).all();
@@ -196,16 +243,27 @@ async function routeApi(request, env, url) {
   const itemMatch = url.pathname.match(/^\/api\/items\/([a-f0-9-]{36})$/);
   if (itemMatch && request.method === "PUT") {
     const item = validItem(await readJson(request));
-    const result = await env.DB.prepare("UPDATE items SET name = ?, quantity = ?, unit = ?, category = ?, expiry_date = ?, date_kind = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND household_id = ?")
-      .bind(item.name, item.quantity, item.unit, item.category, item.expiryDate, item.dateKind, itemMatch[1], hid).run();
-    return result.meta.changes ? json({ ok: true }) : fail("Alimento no encontrado", 404);
+    const results = await env.DB.batch([
+      env.DB.prepare("UPDATE items SET name = ?, quantity = ?, unit = ?, category = ?, expiry_date = ?, date_kind = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND household_id = ?")
+        .bind(item.name, item.quantity, item.unit, item.category, item.expiryDate, item.dateKind, itemMatch[1], hid),
+      env.DB.prepare("UPDATE shopping_items SET name = ?, quantity = ?, unit = ?, category = ? WHERE source_item_id = ? AND household_id = ?")
+        .bind(item.name, item.quantity, item.unit, item.category, itemMatch[1], hid)
+    ]);
+    return results[0].meta.changes ? json({ ok: true }) : fail("Alimento no encontrado", 404);
   }
   if (itemMatch && request.method === "PATCH") {
     const body = await readJson(request);
     if (!allowedStatuses.has(body.status)) return fail("Estado no válido");
-    const result = await env.DB.prepare("UPDATE items SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND household_id = ?")
-      .bind(body.status, itemMatch[1], hid).run();
-    return result.meta.changes ? json({ ok: true }) : fail("Alimento no encontrado", 404);
+    const followUp = body.status === "consumed"
+      ? env.DB.prepare("INSERT OR IGNORE INTO shopping_items (id, household_id, source_item_id, name, quantity, unit, category) SELECT ?, household_id, id, name, quantity, unit, category FROM items WHERE id = ? AND household_id = ? AND status = 'consumed'")
+        .bind(crypto.randomUUID(), itemMatch[1], hid)
+      : env.DB.prepare("DELETE FROM shopping_items WHERE source_item_id = ? AND household_id = ?").bind(itemMatch[1], hid);
+    const results = await env.DB.batch([
+      env.DB.prepare("UPDATE items SET status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND household_id = ?")
+        .bind(body.status, itemMatch[1], hid),
+      followUp
+    ]);
+    return results[0].meta.changes ? json({ ok: true }) : fail("Alimento no encontrado", 404);
   }
   if (itemMatch && request.method === "DELETE") {
     const result = await env.DB.prepare("DELETE FROM items WHERE id = ? AND household_id = ?").bind(itemMatch[1], hid).run();

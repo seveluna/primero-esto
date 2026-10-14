@@ -13,6 +13,8 @@ Plataforma de desarrollo: Codex. Los siguientes mensajes de la persona participa
 9. «Necesito que haya alta de usuarios para que el usuario pueda abrir su despensa en cualquier dispositiva y esta se quede guardada y sioncronizada».
 10. «Los productos deben poder editarse a posteriori también».
 11. «Los alimentos podrán categorizarse como están en el supermercado».
+12. «Debe de haber un lugar donde encontrar los productos agotados en el frigo que sirva como lista de la compra».
+13. «Si un usuario no está registrado no debería de poder añadir alimentos».
 
 Decisiones solicitadas mediante preguntas en la misma sesión:
 

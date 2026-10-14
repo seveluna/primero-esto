@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { token: "", user: null, authMode: "register", editId: null, items: [], filter: "available", categoryFilter: "all" };
+const state = { token: "", user: null, authMode: "register", editId: null, shoppingId: null, items: [], shoppingItems: [], filter: "available", categoryFilter: "all" };
 const categories = [
   ["frutas_verduras", "Frutas y verduras"], ["carniceria", "Carnicería"], ["pescaderia", "Pescadería"],
   ["charcuteria", "Charcutería"], ["lacteos_huevos", "Lácteos y huevos"], ["panaderia", "Panadería"],
@@ -42,11 +42,18 @@ async function ensureHousehold() {
   const incoming = location.hash.match(/^#h=([a-f0-9]{64})$/)?.[1];
   if (incoming) localStorage.setItem("primero-esto-household", incoming);
   state.token = incoming || localStorage.getItem("primero-esto-household") || "";
-  if (!state.token) {
-    const { token } = await api("/api/household", { method: "POST" });
-    state.token = token;
-    localStorage.setItem("primero-esto-household", token);
+}
+
+function requireAccount() {
+  if (state.user && !state.token) return true;
+  if (state.user && state.token) {
+    openAuth("register");
+    toast("Abre tu despensa desde Mi cuenta para modificar alimentos");
+    return false;
   }
+  openAuth("register");
+  toast("Crea una cuenta o inicia sesión para modificar la despensa");
+  return false;
 }
 
 function renderAuth() {
@@ -62,7 +69,7 @@ function renderAuth() {
 function setAuthMode(mode) {
   state.authMode = mode;
   $("#authTitle").textContent = mode === "register" ? "Crear cuenta" : "Iniciar sesión";
-  $("#authIntro").textContent = mode === "register" ? "Los alimentos que ya tienes en este navegador se guardarán en tu cuenta." : "Abre tu despensa guardada desde cualquier dispositivo.";
+  $("#authIntro").textContent = mode === "register" ? "Crea una cuenta para guardar y sincronizar tu despensa. Si esta despensa es tuya, se conservarán sus alimentos." : "Abre tu despensa guardada desde cualquier dispositivo.";
   $("#authSubmit").textContent = mode === "register" ? "Crear cuenta" : "Entrar";
   $("#authSwitch").textContent = mode === "register" ? "¿Ya tienes cuenta? Inicia sesión" : "¿Aún no tienes cuenta? Regístrate";
   $("#passwordHint").hidden = mode !== "register";
@@ -106,8 +113,7 @@ async function logout() {
     localStorage.removeItem("primero-esto-household");
     if (location.hash.startsWith("#h=")) history.replaceState(null, "", location.pathname + location.search);
     $("#authDialog").close();
-    await ensureHousehold();
-    await refresh();
+    clearPantry();
     renderAuth();
     toast("Sesión cerrada. Entra de nuevo para recuperar tu despensa.");
   } catch (error) { toast(error.message); }
@@ -120,7 +126,8 @@ function emojiFor(name) {
 }
 
 function dateLabel(item) {
-  if (item.status === "consumed") return { text: "Aprovechado", cls: "" };
+  if (item.status === "consumed") return { text: "Agotado", cls: "" };
+  if (item.status === "replenished") return { text: "Repuesto", cls: "" };
   if (item.status === "discarded") return { text: "Descartado", cls: "past" };
   const days = daysUntil(item.expiry_date);
   if (days < 0) return { text: `Fecha pasada · ${prettyDate(item.expiry_date)}`, cls: "past" };
@@ -131,6 +138,7 @@ function dateLabel(item) {
 }
 
 function renderItems() {
+  const canEdit = Boolean(state.user && !state.token);
   const available = state.items.filter((item) => item.status === "available");
   const used = state.items.filter((item) => item.status === "consumed");
   $("#countAvailable").textContent = available.length;
@@ -142,7 +150,7 @@ function renderItems() {
   );
   const itemRow = (item) => {
     const date = dateLabel(item);
-    return `<article class="item-row"><span class="item-glyph" aria-hidden="true">${emojiFor(item.name)}</span><div class="item-details"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.quantity)} ${escapeHtml(item.unit)} · ${item.date_kind === "consumo_preferente" ? "Consumo preferente" : "Caducidad"} ${prettyDate(item.expiry_date)}</small></div><span class="item-date ${date.cls}">${date.text}</span><div class="item-actions"><button class="icon-button" data-action="edit" data-id="${item.id}" title="Editar" aria-label="Editar ${escapeHtml(item.name)}">✎</button>${item.status === "available" ? `<button class="icon-button" data-action="consume" data-id="${item.id}" title="Marcar como consumido" aria-label="Marcar ${escapeHtml(item.name)} como consumido">✓</button><button class="icon-button" data-action="discard" data-id="${item.id}" title="Descartar" aria-label="Descartar ${escapeHtml(item.name)}">×</button>` : `<button class="icon-button" data-action="restore" data-id="${item.id}" title="Restaurar" aria-label="Restaurar ${escapeHtml(item.name)}">↶</button>`}<button class="icon-button" data-action="delete" data-id="${item.id}" title="Eliminar" aria-label="Eliminar ${escapeHtml(item.name)}">⌫</button></div></article>`;
+    return `<article class="item-row"><span class="item-glyph" aria-hidden="true">${emojiFor(item.name)}</span><div class="item-details"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.quantity)} ${escapeHtml(item.unit)} · ${item.date_kind === "consumo_preferente" ? "Consumo preferente" : "Caducidad"} ${prettyDate(item.expiry_date)}</small></div><span class="item-date ${date.cls}">${date.text}</span>${canEdit ? `<div class="item-actions"><button class="icon-button" data-action="edit" data-id="${item.id}" title="Editar" aria-label="Editar ${escapeHtml(item.name)}">✎</button>${item.status === "available" ? `<button class="icon-button" data-action="consume" data-id="${item.id}" title="Marcar como agotado" aria-label="Marcar ${escapeHtml(item.name)} como agotado">✓</button><button class="icon-button" data-action="discard" data-id="${item.id}" title="Descartar" aria-label="Descartar ${escapeHtml(item.name)}">×</button>` : item.status === "replenished" ? "" : `<button class="icon-button" data-action="restore" data-id="${item.id}" title="Restaurar" aria-label="Restaurar ${escapeHtml(item.name)}">↶</button>`}<button class="icon-button" data-action="delete" data-id="${item.id}" title="Eliminar" aria-label="Eliminar ${escapeHtml(item.name)}">⌫</button></div>` : ""}</article>`;
   };
   const firstUse = !state.items.length && state.filter === "available" && state.categoryFilter === "all";
   $("#itemList").innerHTML = shown.length
@@ -150,7 +158,21 @@ function renderItems() {
       const inCategory = shown.filter((item) => (item.category || "otros") === id);
       return inCategory.length ? `<section class="category-group"><h3>${label} <span>${inCategory.length}</span></h3>${inCategory.map(itemRow).join("")}</section>` : "";
     }).join("")
-    : `<div class="empty-state"><span class="empty-icon">${firstUse ? "🧺" : "✳"}</span><strong>${firstUse ? "Tu despensa empieza aquí" : "No hay alimentos en esta sección"}</strong><p>${firstUse ? "Añade un alimento y su fecha para empezar a aprovecharlo." : "Prueba con otra sección o filtro."}</p>${firstUse ? '<button class="primary-button" id="addEmptyBtn">Añadir alimento</button><button class="sample-button" id="sampleBtn">Probar con datos de ejemplo</button>' : ""}</div>`;
+    : `<div class="empty-state"><span class="empty-icon">${firstUse ? "🧺" : "✳"}</span><strong>${firstUse ? canEdit ? "Tu despensa empieza aquí" : state.user ? "Despensa compartida" : "Crea una cuenta para empezar" : "No hay alimentos en esta sección"}</strong><p>${firstUse ? canEdit ? "Añade un alimento y su fecha para empezar a aprovecharlo." : state.user ? "Abre tu despensa desde Mi cuenta para añadir alimentos." : "Regístrate para añadir alimentos y sincronizarlos entre dispositivos." : "Prueba con otra sección o filtro."}</p>${firstUse ? canEdit ? '<button class="primary-button" id="addEmptyBtn">Añadir alimento</button><button class="sample-button" id="sampleBtn">Probar con datos de ejemplo</button>' : state.user ? "" : '<button class="primary-button" id="registerEmptyBtn">Crear cuenta</button>' : ""}</div>`;
+}
+
+function renderShopping() {
+  const canEdit = Boolean(state.user && !state.token);
+  const pending = state.shoppingItems.filter((item) => !item.checked);
+  const bought = state.shoppingItems.filter((item) => item.checked);
+  $("#shoppingCount").textContent = pending.length;
+  const row = (item) => `<article class="shopping-row ${item.checked ? "checked" : ""}"><input type="checkbox" data-action="toggle" data-id="${item.id}" ${item.checked ? "checked" : ""} ${canEdit ? "" : "disabled"} aria-label="${item.checked ? "Volver a pendiente" : "Marcar como comprado"}: ${escapeHtml(item.name)}"><span class="item-glyph" aria-hidden="true">${emojiFor(item.name)}</span><span class="shopping-details"><strong>${escapeHtml(item.name)}</strong><small>${escapeHtml(item.quantity)} ${escapeHtml(item.unit)}</small></span>${canEdit ? `<span class="shopping-row-actions"><button type="button" data-action="stock" data-id="${item.id}">Al frigo</button><button type="button" data-action="remove" data-id="${item.id}" aria-label="Quitar ${escapeHtml(item.name)} de la lista">Quitar</button></span>` : ""}</article>`;
+  const groups = categories.map(([id, label]) => {
+    const inCategory = pending.filter((item) => item.category === id);
+    return inCategory.length ? `<section class="category-group"><h3>${label} <span>${inCategory.length}</span></h3>${inCategory.map(row).join("")}</section>` : "";
+  }).join("");
+  $("#shoppingList").innerHTML = (pending.length ? groups : bought.length ? '<div class="shopping-empty"><strong>No quedan compras pendientes</strong></div>' : state.user ? '<div class="shopping-empty"><strong>Tu lista está al día</strong><span>Los alimentos que marques como agotados aparecerán aquí.</span></div>' : '<div class="shopping-empty"><strong>Tu lista de la compra te espera</strong><span>Crea una cuenta para añadir productos.</span></div>') +
+    (bought.length ? `<section class="shopping-done"><h3>Comprados · ${bought.length}</h3>${bought.map(row).join("")}</section>` : "");
 }
 
 function ingredientMatch(ingredient, items) {
@@ -173,14 +195,27 @@ function renderRecipes() {
 }
 
 async function refresh() {
-  const data = await api("/api/items");
-  state.items = data.items;
+  if (!state.user && !state.token) return clearPantry();
+  const [pantry, shopping] = await Promise.all([api("/api/items"), api("/api/shopping")]);
+  state.items = pantry.items;
+  state.shoppingItems = shopping.items;
   renderItems();
+  renderShopping();
+  renderRecipes();
+}
+
+function clearPantry() {
+  state.items = [];
+  state.shoppingItems = [];
+  renderItems();
+  renderShopping();
   renderRecipes();
 }
 
 function openDialog() {
+  if (!requireAccount()) return;
   state.editId = null;
+  state.shoppingId = null;
   $("#addForm").reset();
   $("#itemDialogEyebrow").textContent = "NUEVO ALIMENTO";
   $("#itemDialogTitle").textContent = "Añadir a la despensa";
@@ -189,9 +224,11 @@ function openDialog() {
   $("#itemName").focus();
 }
 function openEdit(id) {
+  if (!requireAccount()) return;
   const item = state.items.find((entry) => entry.id === id);
   if (!item) return toast("No se encontró el alimento");
   state.editId = id;
+  state.shoppingId = null;
   $("#itemName").value = item.name;
   $("#itemQuantity").value = item.quantity;
   $("#itemUnit").value = item.unit;
@@ -204,10 +241,27 @@ function openEdit(id) {
   $("#addDialog").showModal();
   $("#itemName").focus();
 }
-function closeDialog() { $("#addDialog").close(); state.editId = null; }
+function closeDialog() { $("#addDialog").close(); state.editId = null; state.shoppingId = null; }
+
+function stockShoppingItem(id) {
+  if (!requireAccount()) return;
+  const item = state.shoppingItems.find((entry) => entry.id === id);
+  if (!item) return toast("No se encontró el producto");
+  openDialog();
+  state.shoppingId = id;
+  $("#itemName").value = item.name;
+  $("#itemQuantity").value = item.quantity;
+  $("#itemUnit").value = item.unit;
+  $("#itemCategory").value = item.category;
+  $("#itemDate").value = "";
+  $("#itemDialogEyebrow").textContent = "DE LA COMPRA AL FRIGO";
+  $("#itemDialogTitle").textContent = "Reponer alimento";
+  $("#saveItemBtn").textContent = "Guardar en el frigo";
+}
 
 async function saveItem(event) {
   event.preventDefault();
+  if (!requireAccount()) return;
   const form = event.currentTarget;
   const body = Object.fromEntries(new FormData(form).entries());
   body.quantity = Number(body.quantity);
@@ -215,13 +269,16 @@ async function saveItem(event) {
   saveButton.disabled = true;
   try {
     const editing = Boolean(state.editId);
-    await api(editing ? `/api/items/${state.editId}` : "/api/items", { method: editing ? "PUT" : "POST", body: JSON.stringify(body) });
-    form.reset(); closeDialog(); await refresh(); toast(editing ? "Alimento actualizado" : "Alimento añadido a tu despensa");
+    const shoppingId = state.shoppingId;
+    await api(shoppingId ? `/api/shopping/${shoppingId}/replenish` : editing ? `/api/items/${state.editId}` : "/api/items", { method: editing ? "PUT" : "POST", body: JSON.stringify(body) });
+    form.reset(); closeDialog(); await refresh();
+    toast(editing ? "Alimento actualizado" : shoppingId ? "Producto repuesto en el frigo" : "Alimento añadido a tu despensa");
   } catch (error) { toast(error.message); }
   finally { saveButton.disabled = false; }
 }
 
 async function itemAction(button) {
+  if (!requireAccount()) return;
   const { action, id } = button.dataset;
   if (action === "edit") return openEdit(id);
   if (action === "delete" && !confirm("¿Eliminar este alimento de la despensa?")) return;
@@ -229,11 +286,38 @@ async function itemAction(button) {
   try {
     if (action === "delete") await api(`/api/items/${id}`, { method: "DELETE" });
     else await api(`/api/items/${id}`, { method: "PATCH", body: JSON.stringify({ status: { consume: "consumed", discard: "discarded", restore: "available" }[action] }) });
-    await refresh(); toast(action === "consume" ? "¡Alimento aprovechado!" : "Despensa actualizada");
+    await refresh(); toast(action === "consume" ? "Producto agotado y añadido a la lista de la compra" : "Despensa actualizada");
   } catch (error) { button.disabled = false; toast(error.message); }
 }
 
+async function saveShoppingItem(event) {
+  event.preventDefault();
+  if (!requireAccount()) return;
+  const form = event.currentTarget;
+  const body = Object.fromEntries(new FormData(form).entries());
+  body.quantity = Number(body.quantity);
+  const button = form.querySelector('button[type="submit"]');
+  button.disabled = true;
+  try {
+    await api("/api/shopping", { method: "POST", body: JSON.stringify(body) });
+    form.reset(); $("#shoppingDialog").close(); await refresh(); toast("Producto apuntado en la lista");
+  } catch (error) { toast(error.message); }
+  finally { button.disabled = false; }
+}
+
+async function shoppingAction(action, id, checked) {
+  if (!requireAccount()) return;
+  if (action === "stock") return stockShoppingItem(id);
+  try {
+    if (action === "toggle") await api(`/api/shopping/${id}`, { method: "PATCH", body: JSON.stringify({ checked }) });
+    else if (action === "remove") await api(`/api/shopping/${id}`, { method: "DELETE" });
+    await refresh();
+    toast(action === "toggle" ? checked ? "Marcado como comprado" : "Producto pendiente de compra" : "Producto quitado de la lista");
+  } catch (error) { toast(error.message); await refresh().catch(() => {}); }
+}
+
 async function loadSample() {
+  if (!requireAccount()) return;
   const samples = [
     { name: "Tomate", quantity: 3, unit: "ud", category: "frutas_verduras", expiry_date: dateAfter(1), date_kind: "caducidad" },
     { name: "Queso fresco", quantity: 1, unit: "ud", category: "lacteos_huevos", expiry_date: dateAfter(2), date_kind: "caducidad" },
@@ -252,6 +336,7 @@ function urlBase64ToUint8Array(base64String) {
 }
 
 async function activateNotifications() {
+  if (!requireAccount()) return;
   if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return toast("Este navegador no permite avisos push");
   const permission = await Notification.requestPermission();
   if (permission !== "granted") return toast("Activa el permiso de notificaciones para recibir avisos");
@@ -268,13 +353,21 @@ async function activateNotifications() {
 
 function bindEvents() {
   ["#addTopBtn", "#addHeroBtn", "#addListBtn"].forEach((id) => $(id).addEventListener("click", openDialog));
-  $("#itemList").addEventListener("click", (event) => { if (event.target.id === "addEmptyBtn") openDialog(); else if (event.target.id === "sampleBtn") loadSample(); else if (event.target.dataset.action) itemAction(event.target); });
+  $("#itemList").addEventListener("click", (event) => { if (event.target.id === "registerEmptyBtn") openAuth("register"); else if (event.target.id === "addEmptyBtn") openDialog(); else if (event.target.id === "sampleBtn") loadSample(); else if (event.target.dataset.action) itemAction(event.target); });
   $("#closeDialog").addEventListener("click", closeDialog);
   $("#cancelDialog").addEventListener("click", closeDialog);
   $("#addForm").addEventListener("submit", saveItem);
+  $("#addShoppingBtn").addEventListener("click", () => { if (!requireAccount()) return; $("#shoppingForm").reset(); $("#shoppingDialog").showModal(); $("#shoppingForm input[name=name]").focus(); });
+  $("#closeShopping").addEventListener("click", () => $("#shoppingDialog").close());
+  $("#cancelShopping").addEventListener("click", () => $("#shoppingDialog").close());
+  $("#shoppingDialog").addEventListener("click", (event) => { if (event.target === $("#shoppingDialog")) $("#shoppingDialog").close(); });
+  $("#shoppingForm").addEventListener("submit", saveShoppingItem);
+  $("#shoppingList").addEventListener("change", (event) => { if (event.target.dataset.action === "toggle") shoppingAction("toggle", event.target.dataset.id, event.target.checked); });
+  $("#shoppingList").addEventListener("click", (event) => { const button = event.target.closest("button[data-action]"); if (button) shoppingAction(button.dataset.action, button.dataset.id); });
   $("#notifyBtn").addEventListener("click", activateNotifications);
-  $("#testNotifyBtn").addEventListener("click", async () => { try { await api("/api/push/test", { method: "POST" }); toast("Aviso de prueba enviado"); } catch (error) { toast(error.message); } });
+  $("#testNotifyBtn").addEventListener("click", async () => { if (!requireAccount()) return; try { await api("/api/push/test", { method: "POST" }); toast("Aviso de prueba enviado"); } catch (error) { toast(error.message); } });
   $("#shareBtn").addEventListener("click", async () => {
+    if (!state.user && !state.token) return requireAccount();
     try {
       const token = state.token || (await api("/api/share", { method: "POST" })).token;
       await navigator.clipboard.writeText(`${location.origin}/#h=${token}`);
@@ -314,7 +407,7 @@ async function init() {
     await refresh();
   }
   catch (error) { $("#itemList").innerHTML = `<div class="empty-state"><strong>No se pudo cargar la despensa</strong><p>${escapeHtml(error.message)}</p></div>`; toast(error.message); }
-  setInterval(() => { if (!document.hidden) refresh().catch(() => {}); }, 30000);
+  setInterval(() => { if (!document.hidden && (state.user || state.token)) refresh().catch(() => {}); }, 30000);
 }
 
 init();
