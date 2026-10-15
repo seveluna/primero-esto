@@ -1,4 +1,5 @@
 import webpush from "web-push";
+import { aiRoute } from "./ai.js";
 
 const allowedStatuses = new Set(["available", "consumed", "discarded"]);
 const allowedDateKinds = new Set(["caducidad", "consumo_preferente", "estimacion"]);
@@ -181,6 +182,8 @@ function safeEndpoint(endpoint) {
 async function routeApi(request, env, url) {
   const authResponse = await authRoute(request, env, url);
   if (authResponse) return authResponse;
+
+  if (url.pathname.startsWith("/api/ai/")) return aiRoute(request, env, url, await sessionUser(request, env));
 
   if (url.pathname === "/api/share" && request.method === "POST") {
     const user = await sessionUser(request, env);

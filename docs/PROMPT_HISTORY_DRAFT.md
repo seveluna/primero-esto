@@ -19,6 +19,8 @@ Plataforma de desarrollo: Codex. Los siguientes mensajes de la persona participa
 15. «Como van a llegar los avisos en el smartphone?».
 16. «Las ventanas modales en el smartphone cuando se abren se salen de la pantalla».
 17. «Como se crean las recetas. Estaría bien poner un botón para crear lasrecetas con los alimentos que hay en la despensa en ese momento, a parte de las que te cree automaticamente al estar caducando los alimentos».
+18. «Podemos añadir una opción para que el usuario pueda conectar a la app su IA preferida mediante una API?».
+19. «Por ahora que cada usuario añada su IA. A un futuro podría ponerle una clave única y poner esta opción en la versión premium».
 
 Decisiones solicitadas mediante preguntas en la misma sesión:
 

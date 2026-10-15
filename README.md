@@ -14,13 +14,15 @@ Aplicación web para registrar alimentos del frigo, avisar antes de la fecha ind
 - Solo las personas con cuenta e inicio de sesión pueden añadir, editar o cambiar el estado de alimentos y productos de la compra. Las despensas compartidas mediante enlace secreto se pueden consultar sin cuenta, pero son de solo lectura.
 - Lista de la compra con los alimentos agotados, agrupada por sección del supermercado. Permite apuntar productos manualmente, marcarlos como comprados y devolverlos al frigo con una nueva fecha.
 - Avisos web push 3 días antes, 1 día antes y el mismo día de la fecha. Una tarea diaria a las 08:00 UTC revisa D1 y evita duplicados.
-- Recetas de un catálogo local: aparecen sugerencias automáticas para alimentos cercanos a su fecha y un botón busca recetas bajo demanda con lo que hay disponible en ese momento. Se muestran los ingredientes que faltan. Los productos consumidos, descartados o con fecha pasada no se usan para proponer recetas. Esta versión no genera recetas con IA.
+- Recetas de un catálogo local: aparecen sugerencias automáticas para alimentos cercanos a su fecha y un botón busca recetas bajo demanda con lo que hay disponible en ese momento. Se muestran los ingredientes que faltan. Los productos consumidos, descartados o con fecha pasada no se usan para proponer recetas.
+- Conexión opcional de IA por cuenta: OpenAI, Google Gemini, Anthropic Claude u OpenRouter. Cada usuario aporta su propia clave y el identificador del modelo. La clave se cifra antes de guardarse en D1 y nunca vuelve al navegador. El botón de recetas usa el proveedor conectado; el catálogo sigue disponible sin IA. Solo al pulsar para crear recetas se envían al proveedor nombres, cantidades y fechas de alimentos disponibles. Las peticiones pueden tener coste en la cuenta del usuario.
 - Datos de ejemplo para que el jurado pueda probar la app desde una cuenta sin introducir alimentos reales.
 
 ## Arquitectura
 
 - **Cloudflare Worker:** API y lógica de avisos.
 - **Cloudflare D1:** alimentos, despensas, cuentas, sesiones, suscripciones push y registro de avisos enviados.
+- **Secreto de Worker `AI_SETTINGS_KEY`:** clave AES-GCM para cifrar las claves API de cada usuario almacenadas en D1. No es una clave de proveedor de IA.
 - **Assets estáticos y PWA:** interfaz HTML/CSS/JavaScript, manifest y service worker para recibir notificaciones.
 - **Web Push con VAPID:** envía avisos incluso con la app cerrada, siempre que el navegador y el dispositivo permitan push y la persona haya concedido permiso.
 

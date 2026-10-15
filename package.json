@@ -8,7 +8,7 @@
     "deploy": "wrangler deploy",
     "db:local": "wrangler d1 execute primero-esto --local --file=schema.sql",
     "db:remote": "wrangler d1 execute primero-esto --remote --file=schema.sql",
-    "check": "node --check src/worker.js && node --check public/app.js && node --check public/sw.js"
+    "check": "node --check src/worker.js && node --check src/ai.js && node --check public/app.js && node --check public/sw.js && node --test tests/*.test.js"
   },
   "dependencies": {
     "web-push": "^3.6.7"

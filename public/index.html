@@ -83,7 +83,9 @@
       <section class="recipe-section" id="recipes">
         <div class="section-heading"><div><p class="eyebrow">APROVECHA A TIEMPO</p><h2>Recetas para lo que caduca pronto</h2><p class="section-subtitle">Aparecen automáticamente cuando un alimento disponible se acerca a su fecha.</p></div></div>
         <div id="recipeList" class="recipe-grid"></div>
-        <div class="section-heading recipe-manual-heading"><div><p class="eyebrow">ELIGE QUÉ COCINAR</p><h2>Recetas con tu despensa</h2><p class="section-subtitle">Busca ideas con los alimentos disponibles ahora mismo.</p></div><button type="button" class="primary-button" id="generateRecipesBtn">Buscar recetas con mi despensa</button></div>
+        <div class="section-heading recipe-manual-heading"><div><p class="eyebrow">ELIGE QUÉ COCINAR</p><h2>Recetas con tu despensa</h2><p class="section-subtitle">Busca ideas con los alimentos disponibles ahora mismo.</p></div><div class="recipe-buttons"><button type="button" class="outline-button" id="connectAiBtn">Conectar mi IA</button><button type="button" class="primary-button" id="generateRecipesBtn">Buscar recetas con mi despensa</button></div></div>
+        <p id="aiRecipeNote" class="form-note">El catálogo de recetas funciona gratis y sin conectar una IA.</p>
+        <button type="button" class="text-link recipe-catalog-link" id="catalogRecipesBtn" hidden>Ver recetas del catálogo sin IA</button>
         <div id="manualRecipeList" class="recipe-grid" aria-live="polite"><div class="empty-state"><span class="empty-icon">🍽️</span><strong>Tu próxima comida empieza aquí</strong><p>Pulsa el botón para ver recetas con lo que tienes.</p></div></div>
       </section>
     </main>
@@ -143,6 +145,20 @@
         <button type="button" class="ghost-button" id="logoutBtn">Cerrar sesión</button>
       </div>
     </div>
+  </dialog>
+  <dialog id="aiDialog" class="add-dialog ai-dialog">
+    <form id="aiForm">
+      <div class="dialog-heading"><div><p class="eyebrow">TU PROPIA IA</p><h2>Conectar proveedor</h2></div><button type="button" class="close-button" id="closeAi" aria-label="Cerrar">×</button></div>
+      <p class="ai-intro">Elige un proveedor y pega una clave de su API. La clave se cifra y se guarda en tu cuenta; la app no volverá a mostrarla.</p>
+      <div class="form-grid">
+        <label class="full">Proveedor<select name="provider" id="aiProvider"><option value="openai">OpenAI</option><option value="gemini">Google Gemini</option><option value="anthropic">Anthropic Claude</option><option value="openrouter">OpenRouter</option></select></label>
+        <label class="full">Identificador del modelo<input name="model" id="aiModel" maxlength="100" placeholder="Ej. gpt-4.1-mini" autocomplete="off" required></label>
+        <label class="full">Clave de API<input name="api_key" id="aiKey" type="password" maxlength="2048" autocomplete="off" placeholder="Pega aquí tu clave"></label>
+      </div>
+      <p id="aiKeyHint" class="form-note">Necesitas una clave de API del proveedor elegido. Tu suscripción a su chat puede no incluir acceso a la API.</p>
+      <p class="form-note">Al crear recetas con IA se enviarán al proveedor elegido los nombres, cantidades y fechas de los alimentos disponibles. Cada petición puede generar un cargo en tu cuenta del proveedor.</p>
+      <div class="dialog-actions ai-dialog-actions"><button type="button" class="ghost-button" id="disconnectAiBtn" hidden>Desconectar</button><button type="submit" class="primary-button" id="saveAiBtn">Guardar conexión</button></div>
+    </form>
   </dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script type="module" src="/app.js"></script>

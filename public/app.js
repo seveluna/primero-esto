@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { token: "", user: null, authMode: "register", editId: null, shoppingId: null, items: [], shoppingItems: [], filter: "available", categoryFilter: "all", manualRecipesRequested: false };
+const state = { token: "", user: null, authMode: "register", editId: null, shoppingId: null, items: [], shoppingItems: [], filter: "available", categoryFilter: "all", manualRecipeMode: null, aiSettings: { configured: false }, aiRecipeFingerprint: "" };
 const categories = [
   ["frutas_verduras", "Frutas y verduras"], ["carniceria", "Carnicería"], ["pescaderia", "Pescadería"],
   ["charcuteria", "Charcutería"], ["lacteos_huevos", "Lácteos y huevos"], ["panaderia", "Panadería"],
@@ -81,6 +81,22 @@ function renderAuth() {
   $("#authSignedIn").hidden = !signedIn;
   if (signedIn) $("#accountEmail").textContent = state.user.email;
   $("#ownPantryBtn").hidden = !state.token;
+  renderAiConnection();
+}
+
+function renderAiConnection() {
+  const connected = Boolean(state.aiSettings.configured && state.user && !state.token);
+  $("#connectAiBtn").textContent = connected ? "Configurar mi IA ✓" : "Conectar mi IA";
+  $("#generateRecipesBtn").textContent = connected ? "Crear recetas con mi IA" : "Buscar recetas con mi despensa";
+  $("#aiRecipeNote").textContent = connected ? `Conectada a ${providerNames[state.aiSettings.provider]} · ${state.aiSettings.model}. Cada petición puede tener coste en tu cuenta del proveedor.` : "El catálogo de recetas funciona gratis y sin conectar una IA.";
+  $("#catalogRecipesBtn").hidden = !connected;
+}
+
+const providerNames = { openai: "OpenAI", gemini: "Google Gemini", anthropic: "Anthropic Claude", openrouter: "OpenRouter" };
+
+async function loadAiSettings() {
+  state.aiSettings = state.user ? await api("/api/ai/settings") : { configured: false };
+  renderAiConnection();
 }
 
 function setAuthMode(mode) {
@@ -116,6 +132,7 @@ async function submitAuth(event) {
     $("#authForm").reset();
     $("#authDialog").close();
     renderAuth();
+    await loadAiSettings();
     await refresh();
     toast(state.authMode === "register" ? "Cuenta creada. Tu despensa está sincronizada." : "Has entrado en tu despensa.");
   } catch (error) { toast(error.message); }
@@ -127,6 +144,7 @@ async function logout() {
     await api("/api/auth/logout", { method: "POST" });
     state.user = null;
     state.token = "";
+    state.aiSettings = { configured: false };
     localStorage.removeItem("primero-esto-household");
     if (location.hash.startsWith("#h=")) history.replaceState(null, "", location.pathname + location.search);
     $("#authDialog").close();
@@ -212,12 +230,24 @@ function recipeCards(ranked) {
   return ranked.map((recipe) => `<article class="recipe-card"><div class="recipe-art" aria-hidden="true">${recipe.emoji}</div><div class="recipe-content"><span class="recipe-tag">${recipe.missing.length ? `${recipe.count} de ${recipe.ingredients.length} ingredientes` : "Lista para cocinar"} · ${recipe.minutes} min</span><h3>${escapeHtml(recipe.name)}</h3><p>${escapeHtml(recipe.description)}</p><div class="recipe-ingredients">Con: ${escapeHtml(recipe.ingredients.filter((ingredient) => !recipe.missing.includes(ingredient)).join(", "))}</div>${recipe.missing.length ? `<div class="recipe-missing">Te falta: ${escapeHtml(recipe.missing.join(", "))}</div>` : ""}</div></article>`).join("");
 }
 
+function aiRecipeCards(ranked) {
+  return ranked.map((recipe) => `<article class="recipe-card ai-recipe-card"><div class="recipe-art" aria-hidden="true">✨</div><div class="recipe-content"><span class="recipe-tag">RECETA DE TU IA · ${recipe.minutes} min</span><h3>${escapeHtml(recipe.name)}</h3><p>${escapeHtml(recipe.description)}</p><div class="recipe-ingredients">Ingredientes: ${escapeHtml(recipe.ingredients.join(", "))}</div><ol class="ai-recipe-steps">${recipe.steps.map((step) => `<li>${escapeHtml(step)}</li>`).join("")}</ol></div></article>`).join("");
+}
+
+function availableFingerprint() {
+  return JSON.stringify(state.items.filter((item) => item.status === "available" && daysUntil(item.expiry_date) >= 0).map((item) => [item.id, item.name, item.quantity, item.unit, item.expiry_date]));
+}
+
 function renderRecipes() {
   const available = state.items.filter((item) => item.status === "available" && daysUntil(item.expiry_date) >= 0);
   const urgent = available.filter((item) => daysUntil(item.expiry_date) <= 3);
   const urgentRecipes = urgent.length ? rankRecipes(available, true) : [];
   $("#recipeList").innerHTML = urgentRecipes.length ? recipeCards(urgentRecipes) : `<div class="empty-state"><span class="empty-icon">🌿</span><strong>${urgent.length ? "Sin receta para estos alimentos" : "No hay recetas urgentes"}</strong><p>${urgent.length ? "Hay productos cerca de su fecha, pero aún no tenemos una receta que los incluya." : "Cuando un alimento se acerque a su fecha, aparecerán ideas para aprovecharlo aquí."}</p></div>`;
-  if (!state.manualRecipesRequested) return;
+  if (state.manualRecipeMode === "ai" && state.aiRecipeFingerprint !== availableFingerprint()) {
+    state.manualRecipeMode = null;
+    $("#manualRecipeList").innerHTML = '<div class="empty-state"><span class="empty-icon">🍽️</span><strong>Tu despensa ha cambiado</strong><p>Pulsa el botón para crear recetas con los alimentos actuales.</p></div>';
+  }
+  if (state.manualRecipeMode !== "catalog") return;
   const ranked = rankRecipes(available);
   $("#manualRecipeList").innerHTML = ranked.length ? recipeCards(ranked) : `<div class="empty-state"><span class="empty-icon">🍽️</span><strong>${available.length ? "Aún no hay una receta que encaje" : "Tu despensa está vacía"}</strong><p>${available.length ? "Prueba añadiendo más ingredientes disponibles. Ampliaremos el catálogo de recetas." : "Añade alimentos disponibles y vuelve a buscar recetas."}</p></div>`;
 }
@@ -235,7 +265,7 @@ async function refresh() {
 function clearPantry() {
   state.items = [];
   state.shoppingItems = [];
-  state.manualRecipesRequested = false;
+  state.manualRecipeMode = null;
   renderItems();
   renderShopping();
   renderRecipes();
@@ -431,6 +461,66 @@ async function activateNotifications() {
   } catch (error) { toast(`No se pudieron activar los avisos: ${error.message}`); }
 }
 
+function openAiSettings() {
+  if (!requireAccount()) return;
+  $("#aiForm").reset();
+  $("#aiProvider").value = state.aiSettings.provider || "openai";
+  $("#aiModel").value = state.aiSettings.model || "";
+  $("#aiKey").required = !state.aiSettings.configured;
+  $("#aiKeyHint").textContent = state.aiSettings.configured ? "Deja la clave en blanco para conservarla si mantienes el mismo proveedor. Escribe otra para cambiarla." : "Necesitas una clave de API del proveedor elegido. Tu suscripción a su chat puede no incluir acceso a la API.";
+  $("#disconnectAiBtn").hidden = !state.aiSettings.configured;
+  $("#aiDialog").showModal();
+}
+
+async function saveAiSettings(event) {
+  event.preventDefault();
+  const button = $("#saveAiBtn");
+  button.disabled = true;
+  try {
+    const fields = Object.fromEntries(new FormData(event.currentTarget).entries());
+    state.aiSettings = await api("/api/ai/settings", { method: "PUT", body: JSON.stringify(fields) });
+    $("#aiKey").value = "";
+    $("#aiDialog").close();
+    renderAiConnection();
+    toast("IA conectada. Ya puedes crear recetas con tu despensa.");
+  } catch (error) { toast(error.message); }
+  finally { button.disabled = false; }
+}
+
+async function disconnectAi() {
+  const button = $("#disconnectAiBtn");
+  button.disabled = true;
+  try {
+    await api("/api/ai/settings", { method: "DELETE" });
+    state.aiSettings = { configured: false };
+    $("#aiKey").value = "";
+    $("#aiDialog").close();
+    renderAiConnection();
+    state.manualRecipeMode = null;
+    $("#manualRecipeList").innerHTML = '<div class="empty-state"><span class="empty-icon">🍽️</span><strong>Tu próxima comida empieza aquí</strong><p>Pulsa el botón para ver recetas con lo que tienes.</p></div>';
+    toast("Conexión eliminada de tu cuenta.");
+  } catch (error) { toast(error.message); }
+  finally { button.disabled = false; }
+}
+
+async function requestRecipes() {
+  if (!state.aiSettings.configured || !state.user || state.token) {
+    state.manualRecipeMode = "catalog";
+    renderRecipes();
+    return;
+  }
+  const button = $("#generateRecipesBtn");
+  button.disabled = true;
+  button.textContent = "Creando recetas…";
+  try {
+    const { recipes: generated } = await api("/api/ai/recipes", { method: "POST" });
+    state.manualRecipeMode = "ai";
+    state.aiRecipeFingerprint = availableFingerprint();
+    $("#manualRecipeList").innerHTML = aiRecipeCards(generated);
+  } catch (error) { toast(error.message); }
+  finally { button.disabled = false; renderAiConnection(); }
+}
+
 function bindEvents() {
   ["#addTopBtn", "#addHeroBtn", "#addListBtn"].forEach((id) => $(id).addEventListener("click", openDialog));
   $("#itemList").addEventListener("click", (event) => { if (event.target.id === "registerEmptyBtn") openAuth("register"); else if (event.target.id === "addEmptyBtn") openDialog(); else if (event.target.id === "sampleBtn") loadSample(); else if (event.target.dataset.action) itemAction(event.target); });
@@ -482,7 +572,17 @@ function bindEvents() {
   document.querySelectorAll(".filter").forEach((button) => button.addEventListener("click", () => { state.filter = button.dataset.filter; document.querySelectorAll(".filter").forEach((node) => node.classList.toggle("active", node === button)); renderItems(); }));
   $("#categoryFilter").addEventListener("change", (event) => { state.categoryFilter = event.target.value; renderItems(); });
   $("#addDialog").addEventListener("click", (event) => { if (event.target === $("#addDialog")) closeDialog(); });
-  $("#generateRecipesBtn").addEventListener("click", () => { state.manualRecipesRequested = true; renderRecipes(); });
+  $("#generateRecipesBtn").addEventListener("click", requestRecipes);
+  $("#catalogRecipesBtn").addEventListener("click", () => { state.manualRecipeMode = "catalog"; renderRecipes(); });
+  $("#connectAiBtn").addEventListener("click", openAiSettings);
+  $("#closeAi").addEventListener("click", () => $("#aiDialog").close());
+  $("#aiDialog").addEventListener("click", (event) => { if (event.target === $("#aiDialog")) $("#aiDialog").close(); });
+  $("#aiForm").addEventListener("submit", saveAiSettings);
+  $("#disconnectAiBtn").addEventListener("click", disconnectAi);
+  $("#aiProvider").addEventListener("change", () => {
+    $("#aiKey").required = $("#aiProvider").value !== state.aiSettings.provider;
+    $("#aiModel").value = "";
+  });
 }
 
 function syncDialogViewport() {
@@ -505,6 +605,7 @@ async function init() {
     if (user && !incoming) { state.token = ""; localStorage.removeItem("primero-esto-household"); }
     else await ensureHousehold();
     renderAuth();
+    await loadAiSettings();
     await refresh();
   }
   catch (error) { $("#itemList").innerHTML = `<div class="empty-state"><strong>No se pudo cargar la despensa</strong><p>${escapeHtml(error.message)}</p></div>`; toast(error.message); }
