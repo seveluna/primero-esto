@@ -14,7 +14,7 @@ Aplicación web para registrar alimentos del frigo, avisar antes de la fecha ind
 - Solo las personas con cuenta e inicio de sesión pueden añadir, editar o cambiar el estado de alimentos y productos de la compra. Las despensas compartidas mediante enlace secreto se pueden consultar sin cuenta, pero son de solo lectura.
 - Lista de la compra con los alimentos agotados, agrupada por sección del supermercado. Permite apuntar productos manualmente, marcarlos como comprados y devolverlos al frigo con una nueva fecha.
 - Avisos web push 3 días antes, 1 día antes y el mismo día de la fecha. Una tarea diaria a las 08:00 UTC revisa D1 y evita duplicados.
-- Recetas de un catálogo local ordenadas según ingredientes disponibles y urgencia. Muestra ingredientes que faltan. Los productos consumidos, descartados o con fecha pasada no se usan para proponer recetas.
+- Recetas de un catálogo local: aparecen sugerencias automáticas para alimentos cercanos a su fecha y un botón busca recetas bajo demanda con lo que hay disponible en ese momento. Se muestran los ingredientes que faltan. Los productos consumidos, descartados o con fecha pasada no se usan para proponer recetas. Esta versión no genera recetas con IA.
 - Datos de ejemplo para que el jurado pueda probar la app desde una cuenta sin introducir alimentos reales.
 
 ## Arquitectura
@@ -54,6 +54,7 @@ Para guardar la fecha de entrada de frutas y verduras, ejecutar `npx wrangler d1
 - Rechazo de escrituras anónimas, vista de invitado sin acciones de edición y protección frente a escrituras en una despensa ajena mediante su enlace compartido.
 - Paso de agotados a la lista de la compra, reposición con nueva fecha y conservación del historial del producto antiguo.
 - Cálculo y edición de una fecha orientativa para fresas a partir de su entrada en el frigo, con etiqueta diferenciada en la despensa; aviso sin fecha automática para tomate entero.
+- Formularios de alimentos, compra y cuenta comprobados en pantallas de 390 y 320 píxeles de ancho; el contenido largo del modal se desplaza verticalmente y el botón de guardar sigue siendo accesible.
 - Se probó el reconocimiento de fotos durante el desarrollo. Al no leer de forma fiable productos ni etiquetas, se retiró de esta versión.
 
 La incorporación mediante foto queda como posible función premium futura; no forma parte de la aplicación publicada.

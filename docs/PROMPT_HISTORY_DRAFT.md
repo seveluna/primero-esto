@@ -16,6 +16,9 @@ Plataforma de desarrollo: Codex. Los siguientes mensajes de la persona participa
 12. «Debe de haber un lugar donde encontrar los productos agotados en el frigo que sirva como lista de la compra».
 13. «Si un usuario no está registrado no debería de poder añadir alimentos».
 14. «Como controlamos la fecha de caducidad de verduras y frutas? Podría haber un tiempo estimado de vida en el frigo según el alimento que sea».
+15. «Como van a llegar los avisos en el smartphone?».
+16. «Las ventanas modales en el smartphone cuando se abren se salen de la pantalla».
+17. «Como se crean las recetas. Estaría bien poner un botón para crear lasrecetas con los alimentos que hay en la despensa en ese momento, a parte de las que te cree automaticamente al estar caducando los alimentos».
 
 Decisiones solicitadas mediante preguntas en la misma sesión:
 

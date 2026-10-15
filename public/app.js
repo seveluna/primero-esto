@@ -1,5 +1,5 @@
 const $ = (selector) => document.querySelector(selector);
-const state = { token: "", user: null, authMode: "register", editId: null, shoppingId: null, items: [], shoppingItems: [], filter: "available", categoryFilter: "all" };
+const state = { token: "", user: null, authMode: "register", editId: null, shoppingId: null, items: [], shoppingItems: [], filter: "available", categoryFilter: "all", manualRecipesRequested: false };
 const categories = [
   ["frutas_verduras", "Frutas y verduras"], ["carniceria", "Carnicería"], ["pescaderia", "Pescadería"],
   ["charcuteria", "Charcutería"], ["lacteos_huevos", "Lácteos y huevos"], ["panaderia", "Panadería"],
@@ -74,6 +74,7 @@ function requireAccount() {
 
 function renderAuth() {
   const signedIn = Boolean(state.user);
+  if (signedIn) $("#authTitle").textContent = "Mi cuenta";
   $("#accountPrompt").hidden = signedIn;
   $("#accountBtn").textContent = signedIn ? "Mi cuenta ✓" : "Entrar / registro";
   $("#authSignedOut").hidden = signedIn;
@@ -197,19 +198,28 @@ function ingredientMatch(ingredient, items) {
   return items.find((item) => normalize(item.name).includes(normalize(ingredient)) || normalize(ingredient).includes(normalize(item.name)));
 }
 
-function renderRecipes() {
-  const available = state.items.filter((item) => item.status === "available" && daysUntil(item.expiry_date) >= 0);
-  if (!available.length) {
-    $("#recipeList").innerHTML = '<div class="empty-state"><span class="empty-icon">🍽️</span><strong>Las recetas llegarán con tus alimentos</strong><p>Añade productos disponibles para ver ideas adaptadas a tu despensa.</p></div>';
-    return;
-  }
-  const ranked = recipes.map((recipe) => {
+function rankRecipes(available, urgentOnly = false) {
+  return recipes.map((recipe) => {
     const matched = recipe.ingredients.map((ingredient) => ingredientMatch(ingredient, available));
     const count = matched.filter(Boolean).length;
     const urgency = matched.filter(Boolean).reduce((sum, item) => sum + Math.max(0, 4 - daysUntil(item.expiry_date)), 0);
-    return { ...recipe, count, missing: recipe.ingredients.filter((_, index) => !matched[index]), score: count * 10 + urgency + (count === recipe.ingredients.length ? 20 : 0) };
-  }).filter((recipe) => recipe.count > 0).sort((a, b) => b.score - a.score).slice(0, 6);
-  $("#recipeList").innerHTML = ranked.map((recipe) => `<article class="recipe-card"><div class="recipe-art" aria-hidden="true">${recipe.emoji}</div><div class="recipe-content"><span class="recipe-tag">${recipe.missing.length ? `${recipe.count} de ${recipe.ingredients.length} ingredientes` : "Lista para cocinar"} · ${recipe.minutes} min</span><h3>${escapeHtml(recipe.name)}</h3><p>${escapeHtml(recipe.description)}</p><div class="recipe-ingredients">Con: ${escapeHtml(recipe.ingredients.filter((ingredient) => !recipe.missing.includes(ingredient)).join(", "))}</div>${recipe.missing.length ? `<div class="recipe-missing">Te falta: ${escapeHtml(recipe.missing.join(", "))}</div>` : ""}</div></article>`).join("");
+    const hasUrgent = matched.some((item) => item && daysUntil(item.expiry_date) <= 3);
+    return { ...recipe, count, hasUrgent, missing: recipe.ingredients.filter((_, index) => !matched[index]), score: count * 10 + urgency + (count === recipe.ingredients.length ? 20 : 0) };
+  }).filter((recipe) => recipe.count > 0 && (!urgentOnly || recipe.hasUrgent)).sort((a, b) => b.score - a.score).slice(0, 6);
+}
+
+function recipeCards(ranked) {
+  return ranked.map((recipe) => `<article class="recipe-card"><div class="recipe-art" aria-hidden="true">${recipe.emoji}</div><div class="recipe-content"><span class="recipe-tag">${recipe.missing.length ? `${recipe.count} de ${recipe.ingredients.length} ingredientes` : "Lista para cocinar"} · ${recipe.minutes} min</span><h3>${escapeHtml(recipe.name)}</h3><p>${escapeHtml(recipe.description)}</p><div class="recipe-ingredients">Con: ${escapeHtml(recipe.ingredients.filter((ingredient) => !recipe.missing.includes(ingredient)).join(", "))}</div>${recipe.missing.length ? `<div class="recipe-missing">Te falta: ${escapeHtml(recipe.missing.join(", "))}</div>` : ""}</div></article>`).join("");
+}
+
+function renderRecipes() {
+  const available = state.items.filter((item) => item.status === "available" && daysUntil(item.expiry_date) >= 0);
+  const urgent = available.filter((item) => daysUntil(item.expiry_date) <= 3);
+  const urgentRecipes = urgent.length ? rankRecipes(available, true) : [];
+  $("#recipeList").innerHTML = urgentRecipes.length ? recipeCards(urgentRecipes) : `<div class="empty-state"><span class="empty-icon">🌿</span><strong>${urgent.length ? "Sin receta para estos alimentos" : "No hay recetas urgentes"}</strong><p>${urgent.length ? "Hay productos cerca de su fecha, pero aún no tenemos una receta que los incluya." : "Cuando un alimento se acerque a su fecha, aparecerán ideas para aprovecharlo aquí."}</p></div>`;
+  if (!state.manualRecipesRequested) return;
+  const ranked = rankRecipes(available);
+  $("#manualRecipeList").innerHTML = ranked.length ? recipeCards(ranked) : `<div class="empty-state"><span class="empty-icon">🍽️</span><strong>${available.length ? "Aún no hay una receta que encaje" : "Tu despensa está vacía"}</strong><p>${available.length ? "Prueba añadiendo más ingredientes disponibles. Ampliaremos el catálogo de recetas." : "Añade alimentos disponibles y vuelve a buscar recetas."}</p></div>`;
 }
 
 async function refresh() {
@@ -225,9 +235,11 @@ async function refresh() {
 function clearPantry() {
   state.items = [];
   state.shoppingItems = [];
+  state.manualRecipesRequested = false;
   renderItems();
   renderShopping();
   renderRecipes();
+  $("#manualRecipeList").innerHTML = '<div class="empty-state"><span class="empty-icon">🍽️</span><strong>Tu próxima comida empieza aquí</strong><p>Pulsa el botón para ver recetas con lo que tienes.</p></div>';
 }
 
 let autoEstimated = false;
@@ -470,10 +482,20 @@ function bindEvents() {
   document.querySelectorAll(".filter").forEach((button) => button.addEventListener("click", () => { state.filter = button.dataset.filter; document.querySelectorAll(".filter").forEach((node) => node.classList.toggle("active", node === button)); renderItems(); }));
   $("#categoryFilter").addEventListener("change", (event) => { state.categoryFilter = event.target.value; renderItems(); });
   $("#addDialog").addEventListener("click", (event) => { if (event.target === $("#addDialog")) closeDialog(); });
+  $("#generateRecipesBtn").addEventListener("click", () => { state.manualRecipesRequested = true; renderRecipes(); });
+}
+
+function syncDialogViewport() {
+  const viewport = window.visualViewport;
+  document.documentElement.style.setProperty("--dialog-viewport-height", `${viewport?.height || window.innerHeight}px`);
+  document.documentElement.style.setProperty("--dialog-viewport-top", `${viewport?.offsetTop || 0}px`);
 }
 
 async function init() {
   bindEvents();
+  syncDialogViewport();
+  window.visualViewport?.addEventListener("resize", syncDialogViewport);
+  window.visualViewport?.addEventListener("scroll", syncDialogViewport);
   $("#todayLabel").textContent = new Intl.DateTimeFormat("es-ES", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Madrid" }).format(new Date());
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
   try {
