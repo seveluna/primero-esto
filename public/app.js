@@ -465,7 +465,7 @@ function openAiSettings() {
   if (!requireAccount()) return;
   $("#aiForm").reset();
   $("#aiProvider").value = state.aiSettings.provider || "openai";
-  $("#aiModel").value = state.aiSettings.model || "";
+  $("#aiModel").value = state.aiSettings.model || ((state.aiSettings.provider || "openai") === "openai" ? "gpt-4.1-mini" : "");
   $("#aiKey").required = !state.aiSettings.configured;
   $("#aiKeyHint").textContent = state.aiSettings.configured ? "Deja la clave en blanco para conservarla si mantienes el mismo proveedor. Escribe otra para cambiarla." : "Necesitas una clave de API del proveedor elegido. Tu suscripción a su chat puede no incluir acceso a la API.";
   $("#disconnectAiBtn").hidden = !state.aiSettings.configured;
@@ -478,6 +478,7 @@ async function saveAiSettings(event) {
   button.disabled = true;
   try {
     const fields = Object.fromEntries(new FormData(event.currentTarget).entries());
+    if (fields.provider === "openai" && /^(gpt|chatgpt)$/i.test(fields.model.trim())) throw new Error("Usa el identificador exacto del modelo, por ejemplo gpt-4.1-mini.");
     state.aiSettings = await api("/api/ai/settings", { method: "PUT", body: JSON.stringify(fields) });
     $("#aiKey").value = "";
     $("#aiDialog").close();
@@ -581,7 +582,7 @@ function bindEvents() {
   $("#disconnectAiBtn").addEventListener("click", disconnectAi);
   $("#aiProvider").addEventListener("change", () => {
     $("#aiKey").required = $("#aiProvider").value !== state.aiSettings.provider;
-    $("#aiModel").value = "";
+    $("#aiModel").value = $("#aiProvider").value === "openai" ? "gpt-4.1-mini" : "";
   });
 }
 

@@ -44,6 +44,7 @@ test("AI connection is private to the signed-in user and stores only ciphertext"
     called = true;
     assert.equal(url, "https://api.openai.com/v1/chat/completions");
     assert.equal(options.headers.authorization, `Bearer ${apiKey}`);
+    assert.equal(options.redirect, "manual");
     const prompt = JSON.parse(options.body).messages[1].content;
     assert.match(prompt, /tomate/);
     return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify({ recipes: [{ name: "Ensalada", description: "Corta el tomate.", ingredients: ["tomate"], steps: ["Lava y corta el tomate."], minutes: 5 }] }) } }] }), { status: 200 });

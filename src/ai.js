@@ -70,8 +70,12 @@ async function generateRecipes(settings, items, userId, env) {
     body = { model: settings.model, messages: [{ role: "system", content: system }, { role: "user", content: user }], ...(settings.provider === "openai" ? { max_completion_tokens: 1100 } : { max_tokens: 1100 }) };
   }
   let response;
-  try { response = await fetch(providers[settings.provider], { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(25000), redirect: "error" }); }
-  catch { throw new Error("No se pudo contactar con el proveedor de IA. Prueba de nuevo."); }
+  try { response = await fetch(providers[settings.provider], { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(25000), redirect: "manual" }); }
+  catch (cause) {
+    console.error("AI provider request failed", settings.provider, cause?.name, cause?.message);
+    throw new Error("No se pudo contactar con el proveedor de IA. Prueba de nuevo.");
+  }
+  if (response.status >= 300 && response.status < 400) throw new Error("El proveedor redirigió la solicitud. Revisa su configuración.");
   if (!response.ok) {
     if ([401, 403].includes(response.status)) throw new Error("El proveedor rechazó la clave de API. Revísala en Conectar IA.");
     if (response.status === 429) throw new Error("El proveedor ha limitado las solicitudes o se ha agotado tu cuota.");

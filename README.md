@@ -35,8 +35,8 @@ Requisitos: Node.js y una cuenta de Cloudflare conectada a Wrangler.
 ```bash
 npm install
 npm run db:local
-cp .dev.vars.example .dev.vars
-# Sustituir las claves VAPID por un par generado con: npx web-push generate-vapid-keys
+# Crear .dev.vars con VAPID_SUBJECT, VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY y AI_SETTINGS_KEY
+# Generar un par VAPID con: npx web-push generate-vapid-keys
 npm run dev
 ```
 
@@ -45,6 +45,7 @@ Para actualizar una base D1 creada antes de las cuentas, ejecutar `npx wrangler 
 Para añadir las categorías a una base existente, ejecutar después `npx wrangler d1 execute primero-esto --remote --file=migrations/002_categories.sql`. Los alimentos antiguos comienzan en «Otros» y se pueden reclasificar al editarlos.
 Para añadir la lista de la compra, ejecutar `npx wrangler d1 execute primero-esto --remote --file=migrations/003_shopping.sql`. La migración incorpora los alimentos ya marcados como agotados.
 Para guardar la fecha de entrada de frutas y verduras, ejecutar `npx wrangler d1 execute primero-esto --remote --file=migrations/004_produce_dates.sql`.
+Para permitir una IA propia por usuario, ejecutar `npx wrangler d1 execute primero-esto --remote --file=migrations/005_user_ai_settings.sql` y configurar el secreto `AI_SETTINGS_KEY` como una clave aleatoria de 32 bytes codificada en 64 caracteres hexadecimales.
 
 ## Comprobaciones realizadas
 
